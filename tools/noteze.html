@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Noteze - Note taking web app</title>
+  
+  <link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/worksans.woff2" as="font" type="font/woff2" crossorigin>
+  
+  <style>
+    /* --- CSS Variables & Design System --- */
+    @font-face {
+      font-family: "Fraunces";
+      src: url("../fonts/fraunces.woff2");
+      font-weight: 300 700;
+      font-display: swap;
+      size-adjust: 100%;
+    }
+    
+    @font-face {
+      font-family: "Work Sans";
+      src: url("../fonts/worksans.woff2");
+      font-weight: 380 550;
+      font-display: swap;
+    }
+    
+    :root {
+      --bg-primary: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-card: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-subtle: #94a3b8;
+      --border-color: #e2e8f0;
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --accent: #3b82f6;
+      --folder-color: #d97706;
+      --danger: #ef4444;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+      --shadow-float: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+      --header-height: 64px;
+      --bottom-bar-height: 76px;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #090d16;
+        --bg-surface: #111827;
+        --bg-card: #151e32;
+        --text-main: #f1f5f9;
+        --text-muted: #94a3b8;
+        --text-subtle: #64748b;
+        --border-color: #1e293b;
+        --primary: #f8fafc;
+        --primary-hover: #e2e8f0;
+        --folder-color: #f59e0b;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    
+    input,
+    textarea {
+      user-select: text;
+    }
+    
+    body {
+      font-family: 'Fraunces', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    /* Mobile Container Frame */
+    .app-viewport {
+      width: 100%;
+      max-width: 500px;
+      min-height: 100vh;
+      background-color: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      border-left: 1px solid var(--border-color);
+      border-right: 1px solid var(--border-color);
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.02);
+    }
+    
+    /* --- SVG Icon Common Styling --- */
+    .svg-icon {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    
+    /* --- Header --- */
+    header {
+      height: var(--header-height);
+      position: sticky;
+      top: 0;
+      background-color: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      z-index: 20;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    
+    .back-btn {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-main);
+      padding: 6px;
+      border-radius: var(--radius-sm);
+      line-height: 0;
+    }
+    
+    .brand-logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .header-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-main);
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .icon-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+    }
+    
+    .icon-btn:active {
+      transform: scale(0.92);
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+    }
+    
+    /* --- Search & Filter Bar --- */
+    .search-section {
+      padding: 12px 18px 6px;
+    }
+    
+    .search-box {
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      gap: 10px;
+      color: var(--text-muted);
+    }
+    
+    .search-box input {
+      border: none;
+      background: transparent;
+      outline: none;
+      width: 100%;
+      font-size: 0.92rem;
+      color: var(--text-main);
+      font-family: 'Work Sans';
+    }
+    
+    /* --- Card List Container --- */
+    main {
+      flex: 1;
+      padding: 12px 18px 100px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+    
+    /* --- Cards --- */
+    .item-card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-color);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease, border-color 0.15s ease;
+      overflow: hidden;
+    }
+    
+    .item-card:active {
+      transform: scale(0.985);
+      box-shadow: none;
+    }
+    
+    .item-card.pinned {
+      border-color: var(--accent);
+    }
+    
+    .card-top {
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    
+    .card-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .card-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .pin-badge {
+      color: var(--accent);
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+    }
+    
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .card-preview {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .card-bottom-bar {
+      border-top: 1px solid var(--border-color);
+      background-color: var(--bg-primary);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+    
+    .card-meta-date {
+      color: var(--text-subtle);
+      font-weight: 500;
+    }
+    
+    .card-badge {
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    
+    .badge-note {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--accent);
+    }
+    
+    .badge-folder {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--folder-color);
+    }
+    
+    /* --- Empty State --- */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--text-subtle);
+      gap: 14px;
+    }
+    
+    .empty-state .svg-icon {
+      width: 48px;
+      height: 48px;
+      color: var(--text-muted);
+      stroke-width: 1.5;
+    }
+    
+    /* --- Fixed Bottom Action Bar --- */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      max-width: 500px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-color);
+      padding: 12px 18px calc(12px + var(--safe-bottom));
+      display: flex;
+      gap: 12px;
+      box-shadow: var(--shadow-float);
+      z-index: 20;
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: 'Work Sans';
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+      transition: all 0.15s ease;
+    }
+    
+    .btn:active {
+      transform: scale(0.97);
+    }
+    
+    .btn-secondary {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      color: var(--bg-surface);
+    }
+    
+    /* --- Slide-Over Editor View --- */
+    .editor-screen {
+      position: fixed;
+      inset: 0;
+      background-color: var(--bg-surface);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    .editor-screen.active {
+      transform: translateY(0);
+    }
+    
+    .editor-header {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .editor-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 18px 20px;
+      overflow-y: auto;
+      gap: 12px;
+    }
+    
+    .note-title-input {
+      font-size: 1.35rem;
+      font-weight: 700;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text-main);
+      font-family: inherit;
+    }
+    
+    .note-content-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text-main);
+      font-size: 1rem;
+      line-height: 1.6;
+      resize: none;
+      font-family: 'Work Sans';
+    }
+    
+    .editor-footer {
+      padding: 12px 18px calc(12px + var(--safe-bottom));
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    
+    /* --- Action Sheet Modal --- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(3px);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .action-sheet {
+      width: 100%;
+      max-width: 500px;
+      background: var(--bg-surface);
+      border-top-left-radius: var(--radius-lg);
+      border-top-right-radius: var(--radius-lg);
+      padding: 16px 18px calc(18px + var(--safe-bottom));
+      transform: translateY(100%);
+      transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .modal-overlay.active .action-sheet {
+      transform: translateY(0);
+    }
+    
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border-color);
+      border-radius: 2px;
+      margin: 0 auto 10px;
+    }
+    
+    .sheet-btn {
+      width: 100%;
+      padding: 13px 16px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: none;
+      background: var(--bg-primary);
+      color: var(--text-main);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+    
+    .sheet-btn:active {
+      background-color: var(--border-color);
+    }
+    
+    .sheet-btn.danger {
+      color: var(--danger);
+    }
+    
+    /* --- Dialog Prompt Modal --- */
+    .dialog-content {
+      width: 90%;
+      max-width: 380px;
+      background: var(--bg-surface);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      margin: auto;
+      box-shadow: var(--shadow-float);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    
+    .dialog-content h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    
+    .dialog-input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: var(--bg-primary);
+      color: var(--text-main);
+      font-size: 0.95rem;
+      outline: none;
+      font-family: 'Work Sans';
+    }
+    
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      background: #0f172a;
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 30px;
+      font-family: 'Work Sans';
+      font-size: 0.85rem;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.22s ease;
+      z-index: 200;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+
+<body>
+  
+  <div class="app-viewport">
+    <!-- Header -->
+    <header>
+      <div class="header-left">
+        <button id="backBtn" class="back-btn" aria-label="Back">
+          <!-- Chevron Left SVG -->
+        </button>
+        <div class="brand-logo" id="brandLogo">
+          <!-- Brand Notebook SVG -->
+          <span>noteze</span>
+        </div>
+        <div class="header-title" id="folderTitleDisplay" style="display: none;"></div>
+      </div>
+      
+      <div class="header-actions">
+        <button class="icon-btn" id="bulkExportBtn" title="Export Current View as ZIP">
+          <!-- Folder Archive SVG -->
+        </button>
+      </div>
+    </header>
+    
+    <!-- Search Section -->
+    <div class="search-section">
+      <div class="search-box">
+        <span id="searchIconWrap"></span>
+        <input type="text" id="searchInput" placeholder="Search notes..." />
+      </div>
+    </div>
+    
+    <!-- Items List (Cards) -->
+    <main id="itemList">
+      <!-- Rendered dynamically -->
+    </main>
+    
+    <!-- Bottom Action Bar -->
+    <div class="bottom-bar" id="bottomBar">
+      <button class="btn btn-secondary" id="addFolderBtn">
+        <span class="btn-icon" data-icon="folder-plus"></span> Add Folder
+      </button>
+      <button class="btn btn-primary" id="addNoteBtn">
+        <span class="btn-icon" data-icon="file-plus"></span> Add Note
+      </button>
+    </div>
+  </div>
+  
+  <!-- Fullscreen Note Editor -->
+  <div class="editor-screen" id="editorScreen">
+    <div class="editor-header">
+      <button class="icon-btn" id="closeEditorBtn" aria-label="Close Editor">
+        <!-- Arrow Left SVG -->
+      </button>
+      <div style="display: flex; gap: 8px;">
+        <button class="icon-btn" id="exportTxtBtn" title="Export as .txt">
+          <!-- Download SVG -->
+        </button>
+        <button class="btn btn-primary" id="saveNoteBtn" style="padding: 6px 14px; font-size: 0.85rem; height: 34px;">
+          Done
+        </button>
+      </div>
+    </div>
+    <div class="editor-body">
+      <input type="text" class="note-title-input" id="noteTitle" placeholder="Title" />
+      <textarea class="note-content-input" id="noteContent" placeholder="Type your note here..."></textarea>
+    </div>
+    <div class="editor-footer">
+      <span id="editorWordCount">0 words</span>
+      <span id="editorLastSaved">Unsaved</span>
+    </div>
+  </div>
+  
+  <!-- Action Sheet Modal for 3-dots Menu -->
+  <div class="modal-overlay" id="actionSheetModal">
+    <div class="action-sheet">
+      <div class="sheet-handle"></div>
+      <button class="sheet-btn" id="sheetPinBtn">
+        <span class="sheet-icon" data-icon="pin"></span>
+        <span class="sheet-label">Pin to Top</span>
+      </button>
+      <button class="sheet-btn" id="sheetRenameBtn">
+        <span class="sheet-icon" data-icon="pencil"></span>
+        <span class="sheet-label">Rename</span>
+      </button>
+      <button class="sheet-btn" id="sheetExportBtn">
+        <span class="sheet-icon" data-icon="download"></span>
+        <span class="sheet-label">Export File</span>
+      </button>
+      <button class="sheet-btn danger" id="sheetDeleteBtn">
+        <span class="sheet-icon" data-icon="trash-2"></span>
+        <span class="sheet-label">Delete</span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Custom Dialog Prompt Modal -->
+  <div class="modal-overlay" id="dialogModal" style="align-items: center;">
+    <div class="dialog-content">
+      <h3 id="dialogTitle">Folder Name</h3>
+      <input type="text" class="dialog-input" id="dialogInput" placeholder="Enter name..." />
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" id="dialogCancelBtn" style="flex: 0; padding: 8px 16px;">Cancel</button>
+        <button class="btn btn-primary" id="dialogConfirmBtn" style="flex: 0; padding: 8px 16px;">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Toast Notification -->
+  <div class="toast" id="toastMessage">Saved</div>
+  
+  <!-- Application Logic -->
+  <script>
+    /* ==========================================================================
+       SVG Icons System (Zero External CDNs)
+       ========================================================================== */
+    const SVG_ICONS = {
+      'chevron-left': '<path d="m15 18-6-6 6-6"/>',
+      'notebook-pen': '<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>',
+      'folder-archive': '<circle cx="12" cy="13" r="1"/><circle cx="12" cy="17" r="1"/><circle cx="12" cy="9" r="1"/><path d="M4 20V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>',
+      'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+      'search-x': '<path d="m13.5 8.5-5 5"/><path d="m8.5 8.5 5 5"/><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+      'folder-open': '<path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/>',
+      'folder-plus': '<path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+      'file-plus': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 12v6"/>',
+      'arrow-left': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+      'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+      'pin': '<line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>',
+      'pencil': '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+      'trash-2': '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+      'folder': '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+      'file-text': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+      'more-horizontal': '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>'
+    };
+    
+    function getIconSvg(name, extraClass = '', extraStyle = '') {
+      const content = SVG_ICONS[name] || '';
+      return `<svg class="svg-icon ${extraClass}" style="${extraStyle}" viewBox="0 0 24 24">${content}</svg>`;
+    }
+    
+    // Initialize static UI icons
+    function initStaticIcons() {
+      document.getElementById('backBtn').innerHTML = getIconSvg('chevron-left');
+      document.getElementById('brandLogo').insertAdjacentHTML('afterbegin', getIconSvg('notebook-pen'));
+      document.getElementById('bulkExportBtn').innerHTML = getIconSvg('folder-archive');
+      document.getElementById('searchIconWrap').innerHTML = getIconSvg('search', '', 'width: 18px; height: 18px;');
+      document.getElementById('closeEditorBtn').innerHTML = getIconSvg('arrow-left');
+      document.getElementById('exportTxtBtn').innerHTML = getIconSvg('download');
+      
+      document.querySelectorAll('[data-icon]').forEach(el => {
+        const iconName = el.getAttribute('data-icon');
+        el.innerHTML = getIconSvg(iconName);
+      });
+    }
+    
+    /* ==========================================================================
+       Native Micro-ZIP Builder (Zero External Libraries)
+       ========================================================================== */
+    const CRC32_TABLE = new Int32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) {
+        c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+      }
+      CRC32_TABLE[i] = c;
+    }
+    
+    function calculateCRC32(uint8Array) {
+      let crc = -1;
+      for (let i = 0; i < uint8Array.length; i++) {
+        crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ uint8Array[i]) & 0xFF];
+      }
+      return (crc ^ -1) >>> 0;
+    }
+    
+    class SimpleZip {
+      constructor() {
+        this.files = [];
+      }
+      
+      file(path, content) {
+        const encoder = new TextEncoder();
+        const data = typeof content === 'string' ? encoder.encode(content) : content;
+        this.files.push({ path, data });
+      }
+      
+      generateBlob() {
+        const localHeaders = [];
+        const centralDirs = [];
+        let offset = 0;
+        const encoder = new TextEncoder();
+        
+        const now = new Date();
+        const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (Math.floor(now.getSeconds() / 2));
+        const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+        
+        for (const file of this.files) {
+          const pathBytes = encoder.encode(file.path);
+          const crc = calculateCRC32(file.data);
+          const size = file.data.length;
+          
+          // Local File Header
+          const localHeader = new Uint8Array(30 + pathBytes.length);
+          const localView = new DataView(localHeader.buffer);
+          localView.setUint32(0, 0x04034b50, true); // Local header signature
+          localView.setUint16(4, 20, true); // Version needed
+          localView.setUint16(6, 0, true); // General purpose bit flag
+          localView.setUint16(8, 0, true); // Compression method (0 = store)
+          localView.setUint16(10, dosTime, true);
+          localView.setUint16(12, dosDate, true);
+          localView.setUint32(14, crc, true);
+          localView.setUint32(18, size, true); // Compressed size
+          localView.setUint32(22, size, true); // Uncompressed size
+          localView.setUint16(26, pathBytes.length, true);
+          localView.setUint16(28, 0, true); // Extra field length
+          localHeader.set(pathBytes, 30);
+          
+          localHeaders.push(localHeader, file.data);
+          
+          // Central Directory Header
+          const centralHeader = new Uint8Array(46 + pathBytes.length);
+          const centralView = new DataView(centralHeader.buffer);
+          centralView.setUint32(0, 0x02014b50, true); // Central header signature
+          centralView.setUint16(4, 20, true); // Version made by
+          centralView.setUint16(6, 20, true); // Version needed
+          centralView.setUint16(8, 0, true);
+          centralView.setUint16(10, 0, true);
+          centralView.setUint16(12, dosTime, true);
+          centralView.setUint16(14, dosDate, true);
+          centralView.setUint32(16, crc, true);
+          centralView.setUint32(20, size, true);
+          centralView.setUint32(24, size, true);
+          centralView.setUint16(28, pathBytes.length, true);
+          centralView.setUint16(30, 0, true);
+          centralView.setUint16(32, 0, true);
+          centralView.setUint16(34, 0, true);
+          centralView.setUint16(36, 0, true);
+          centralView.setUint32(38, 0, true);
+          centralView.setUint32(42, offset, true); // Offset of local header
+          centralHeader.set(pathBytes, 46);
+          
+          centralDirs.push(centralHeader);
+          offset += localHeader.length + size;
+        }
+        
+        const cdOffset = offset;
+        let cdSize = 0;
+        for (const cd of centralDirs) cdSize += cd.length;
+        
+        // End of Central Directory
+        const eocd = new Uint8Array(22);
+        const eocdView = new DataView(eocd.buffer);
+        eocdView.setUint32(0, 0x06054b50, true);
+        eocdView.setUint16(4, 0, true);
+        eocdView.setUint16(6, 0, true);
+        eocdView.setUint16(8, this.files.length, true);
+        eocdView.setUint16(10, this.files.length, true);
+        eocdView.setUint32(12, cdSize, true);
+        eocdView.setUint32(16, cdOffset, true);
+        eocdView.setUint16(20, 0, true);
+        
+        return new Blob([...localHeaders, ...centralDirs, eocd], { type: 'application/zip' });
+      }
+    }
+    
+    /* ==========================================================================
+       State Management & Storage
+       ========================================================================== */
+    const STORAGE_KEY = 'noteze_app_data_v1';
+    
+    let state = {
+      items: [],
+      currentFolderId: null,
+      searchQuery: '',
+      activeItemForSheet: null,
+      editingNoteId: null
+    };
+    
+    function loadState() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) {
+        try {
+          state.items = JSON.parse(data);
+        } catch (e) {
+          state.items = [];
+        }
+      } else {
+        state.items = [
+        {
+          id: 'demo-folder-1',
+          type: 'folder',
+          title: 'Personal Ideas',
+          parentId: null,
+          pinned: false,
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'demo-note-1',
+          type: 'note',
+          title: 'Welcome to Noteze 📝',
+          content: 'This app is designed with a modern mobile-first UI.\n\nFeatures:\n- Add Folders and Notes\n- Instant Export as TXT or ZIP\n- Pinned items\n- Zero external libraries or CDNs',
+          parentId: null,
+          pinned: true,
+          updatedAt: new Date().toISOString()
+        }];
+        saveState();
+      }
+    }
+    
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
+    }
+    
+    /* ==========================================================================
+       Utilities
+       ========================================================================== */
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (isToday) {
+        return `Today, ${timeStr}`;
+      }
+      return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+    }
+    
+    function showToast(msg) {
+      const toast = document.getElementById('toastMessage');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+    
+    function downloadFile(filename, blob) {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    }
+    
+    function sanitizeFileName(name) {
+      return (name || 'Untitled').replace(/[/\\?%*:|"<>]/g, '-').trim();
+    }
+    
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+    
+    /* ==========================================================================
+       Render Engine
+       ========================================================================== */
+    const itemList = document.getElementById('itemList');
+    const backBtn = document.getElementById('backBtn');
+    const brandLogo = document.getElementById('brandLogo');
+    const folderTitleDisplay = document.getElementById('folderTitleDisplay');
+    const addFolderBtn = document.getElementById('addFolderBtn');
+    
+    function render() {
+      // 1. Navigation state
+      if (state.currentFolderId) {
+        const currentFolder = state.items.find(i => i.id === state.currentFolderId);
+        backBtn.style.display = 'block';
+        brandLogo.style.display = 'none';
+        folderTitleDisplay.style.display = 'block';
+        folderTitleDisplay.textContent = currentFolder ? currentFolder.title : 'Folder';
+        addFolderBtn.style.display = 'none';
+      } else {
+        backBtn.style.display = 'none';
+        brandLogo.style.display = 'flex';
+        folderTitleDisplay.style.display = 'none';
+        addFolderBtn.style.display = 'flex';
+      }
+      
+      // 2. Filter items
+      const query = state.searchQuery.trim().toLowerCase();
+      let filtered = state.items.filter(item => {
+        const matchesFolder = item.parentId === state.currentFolderId;
+        const matchesSearch = query === '' ||
+          item.title.toLowerCase().includes(query) ||
+          (item.content && item.content.toLowerCase().includes(query));
+        
+        return query ? matchesSearch : matchesFolder;
+      });
+      
+      // 3. Sort: Pinned first, then recent
+      filtered.sort((a, b) => {
+        if (a.pinned === b.pinned) {
+          return new Date(b.updatedAt) - new Date(a.updatedAt);
+        }
+        return a.pinned ? -1 : 1;
+      });
+      
+      // 4. Render DOM
+      itemList.innerHTML = '';
+      
+      if (filtered.length === 0) {
+        const emptyIcon = query ? 'search-x' : 'folder-open';
+        itemList.innerHTML = `
+          <div class="empty-state">
+            ${getIconSvg(emptyIcon)}
+            <p>${query ? 'No matching notes found' : 'This folder is empty'}</p>
+          </div>
+        `;
+        return;
+      }
+      
+      filtered.forEach(item => {
+        const isFolder = item.type === 'folder';
+        const card = document.createElement('div');
+        card.className = `item-card ${item.pinned ? 'pinned' : ''}`;
+        
+        let previewText = '';
+        if (isFolder) {
+          const count = state.items.filter(i => i.parentId === item.id).length;
+          previewText = `${count} ${count === 1 ? 'item' : 'items'}`;
+        } else {
+          previewText = item.content && item.content.trim() ? item.content.trim() : 'Empty note';
+        }
+        
+        const typeIcon = isFolder ?
+          getIconSvg('folder', '', 'color: var(--folder-color);') :
+          getIconSvg('file-text', '', 'color: var(--accent);');
+        
+        const pinIcon = item.pinned ? getIconSvg('pin', 'pin-badge') : '';
+        const moreIcon = getIconSvg('more-horizontal');
+        
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="card-info">
+              <div class="card-title-row">
+                ${typeIcon}
+                <span class="card-title">${escapeHtml(item.title || 'Untitled')}</span>
+                ${pinIcon}
+              </div>
+              <div class="card-preview">${escapeHtml(previewText)}</div>
+            </div>
+            <div class="card-actions">
+              <button class="icon-btn card-menu-btn" data-id="${item.id}" title="Options" aria-label="Item Options">
+                ${moreIcon}
+              </button>
+            </div>
+          </div>
+          <div class="card-bottom-bar">
+            <span class="card-meta-date">${formatDate(item.updatedAt)}</span>
+            <span class="card-badge ${isFolder ? 'badge-folder' : 'badge-note'}">${isFolder ? 'Folder' : 'Note'}</span>
+          </div>
+        `;
+        
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.card-menu-btn')) return;
+          if (isFolder) {
+            state.currentFolderId = item.id;
+            render();
+          } else {
+            openEditor(item.id);
+          }
+        });
+        
+        const menuBtn = card.querySelector('.card-menu-btn');
+        menuBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openActionSheet(item);
+        });
+        
+        itemList.appendChild(card);
+      });
+    }
+    
+    /* ==========================================================================
+       Editor Screen Interactions
+       ========================================================================== */
+    const editorScreen = document.getElementById('editorScreen');
+    const noteTitleInput = document.getElementById('noteTitle');
+    const noteContentInput = document.getElementById('noteContent');
+    const editorWordCount = document.getElementById('editorWordCount');
+    const editorLastSaved = document.getElementById('editorLastSaved');
+    const closeEditorBtn = document.getElementById('closeEditorBtn');
+    const saveNoteBtn = document.getElementById('saveNoteBtn');
+    const exportTxtBtn = document.getElementById('exportTxtBtn');
+    let autoSaveTimer = null;
+    
+    function openEditor(noteId = null) {
+      state.editingNoteId = noteId;
+      if (noteId) {
+        const note = state.items.find(i => i.id === noteId);
+        if (note) {
+          noteTitleInput.value = note.title || '';
+          noteContentInput.value = note.content || '';
+          editorLastSaved.textContent = `Saved ${formatDate(note.updatedAt)}`;
+        }
+      } else {
+        noteTitleInput.value = '';
+        noteContentInput.value = '';
+        editorLastSaved.textContent = 'Unsaved';
+      }
+      updateWordCount();
+      editorScreen.classList.add('active');
+    }
+    
+    function closeEditor() {
+      clearTimeout(autoSaveTimer);
+      saveActiveNote();
+      editorScreen.classList.remove('active');
+      state.editingNoteId = null;
+      render();
+    }
+    
+    function updateWordCount() {
+      const text = noteContentInput.value.trim();
+      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+      editorWordCount.textContent = `${words} ${words === 1 ? 'word' : 'words'}`;
+    }
+    
+    function saveActiveNote() {
+      const rawTitle = noteTitleInput.value.trim();
+      const rawContent = noteContentInput.value;
+      
+      // If creating a new note and it's empty, ignore
+      if (!state.editingNoteId && !rawTitle && !rawContent.trim()) {
+        return;
+      }
+      
+      const title = rawTitle || 'Untitled Note';
+      
+      if (state.editingNoteId) {
+        const note = state.items.find(i => i.id === state.editingNoteId);
+        if (note) {
+          // If existing note is wiped completely blank, remove it
+          if (!rawTitle && !rawContent.trim()) {
+            state.items = state.items.filter(i => i.id !== state.editingNoteId);
+            saveState();
+            return;
+          }
+          note.title = title;
+          note.content = rawContent;
+          note.updatedAt = new Date().toISOString();
+        }
+      } else {
+        const newNote = {
+          id: 'note_' + Date.now(),
+          type: 'note',
+          title: title,
+          content: rawContent,
+          parentId: state.currentFolderId,
+          pinned: false,
+          updatedAt: new Date().toISOString()
+        };
+        state.items.unshift(newNote);
+        state.editingNoteId = newNote.id;
+      }
+      saveState();
+      editorLastSaved.textContent = `Saved ${formatDate(new Date())}`;
+    }
+    
+    noteContentInput.addEventListener('input', () => {
+      updateWordCount();
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(saveActiveNote, 500);
+    });
+    
+    noteTitleInput.addEventListener('input', () => {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(saveActiveNote, 500);
+    });
+    
+    closeEditorBtn.addEventListener('click', closeEditor);
+    saveNoteBtn.addEventListener('click', closeEditor);
+    
+    exportTxtBtn.addEventListener('click', () => {
+      const title = sanitizeFileName(noteTitleInput.value) + '.txt';
+      const blob = new Blob([noteContentInput.value], { type: 'text/plain;charset=utf-8' });
+      downloadFile(title, blob);
+      showToast('Note exported.');
+    });
+    
+    /* ==========================================================================
+       Action Sheet (3-Dots Menu)
+       ========================================================================== */
+    const actionSheetModal = document.getElementById('actionSheetModal');
+    const sheetPinBtn = document.getElementById('sheetPinBtn');
+    const sheetRenameBtn = document.getElementById('sheetRenameBtn');
+    const sheetExportBtn = document.getElementById('sheetExportBtn');
+    const sheetDeleteBtn = document.getElementById('sheetDeleteBtn');
+    
+    function openActionSheet(item) {
+      state.activeItemForSheet = item;
+      sheetPinBtn.querySelector('.sheet-label').textContent = item.pinned ? 'Unpin from Top' : 'Pin to Top';
+      actionSheetModal.classList.add('active');
+    }
+    
+    function closeActionSheet() {
+      actionSheetModal.classList.remove('active');
+      state.activeItemForSheet = null;
+    }
+    
+    actionSheetModal.addEventListener('click', (e) => {
+      if (e.target === actionSheetModal) closeActionSheet();
+    });
+    
+    sheetPinBtn.addEventListener('click', () => {
+      if (!state.activeItemForSheet) return;
+      state.activeItemForSheet.pinned = !state.activeItemForSheet.pinned;
+      state.activeItemForSheet.updatedAt = new Date().toISOString();
+      saveState();
+      closeActionSheet();
+      render();
+      showToast(state.activeItemForSheet.pinned ? 'Pinned to top' : 'Unpinned');
+    });
+    
+    sheetRenameBtn.addEventListener('click', () => {
+      const item = state.activeItemForSheet;
+      closeActionSheet();
+      openDialog(`Rename ${item.type === 'folder' ? 'Folder' : 'Note'}`, item.title, (newTitle) => {
+        if (newTitle && newTitle.trim()) {
+          item.title = newTitle.trim();
+          item.updatedAt = new Date().toISOString();
+          saveState();
+          render();
+          showToast('Renamed successfully');
+        }
+      });
+    });
+    
+    sheetDeleteBtn.addEventListener('click', () => {
+      const item = state.activeItemForSheet;
+      if (!item) return;
+      if (item.type === 'folder') {
+        state.items = state.items.filter(i => i.id !== item.id && i.parentId !== item.id);
+      } else {
+        state.items = state.items.filter(i => i.id !== item.id);
+      }
+      saveState();
+      closeActionSheet();
+      render();
+      showToast('Deleted');
+    });
+    
+    sheetExportBtn.addEventListener('click', () => {
+      const item = state.activeItemForSheet;
+      if (!item) return;
+      if (item.type === 'note') {
+        const blob = new Blob([item.content || ''], { type: 'text/plain;charset=utf-8' });
+        downloadFile(`${sanitizeFileName(item.title)}.txt`, blob);
+        showToast('Note exported.');
+      } else {
+        exportFolderAsZip(item);
+      }
+      closeActionSheet();
+    });
+    
+    /* ==========================================================================
+       Dialog Prompt Modal
+       ========================================================================== */
+    const dialogModal = document.getElementById('dialogModal');
+    const dialogTitle = document.getElementById('dialogTitle');
+    const dialogInput = document.getElementById('dialogInput');
+    const dialogCancelBtn = document.getElementById('dialogCancelBtn');
+    const dialogConfirmBtn = document.getElementById('dialogConfirmBtn');
+    let dialogCallback = null;
+    
+    function openDialog(title, defaultValue, callback) {
+      dialogTitle.textContent = title;
+      dialogInput.value = defaultValue || '';
+      dialogCallback = callback;
+      dialogModal.classList.add('active');
+      setTimeout(() => dialogInput.focus(), 50);
+    }
+    
+    function closeDialog() {
+      dialogModal.classList.remove('active');
+      dialogCallback = null;
+      dialogInput.value = '';
+    }
+    
+    function confirmDialog() {
+      if (dialogCallback) dialogCallback(dialogInput.value);
+      closeDialog();
+    }
+    
+    dialogCancelBtn.addEventListener('click', closeDialog);
+    dialogConfirmBtn.addEventListener('click', confirmDialog);
+    dialogModal.addEventListener('click', (e) => {
+      if (e.target === dialogModal) closeDialog();
+    });
+    
+    dialogInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirmDialog();
+      if (e.key === 'Escape') closeDialog();
+    });
+    
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (dialogModal.classList.contains('active')) closeDialog();
+        else if (actionSheetModal.classList.contains('active')) closeActionSheet();
+        else if (editorScreen.classList.contains('active')) closeEditor();
+      }
+    });
+    
+    /* ==========================================================================
+       Folder & Bulk ZIP Exporters (Native JS ZIP)
+       ========================================================================== */
+    function exportFolderAsZip(folder) {
+      const zip = new SimpleZip();
+      const childNotes = state.items.filter(i => i.parentId === folder.id && i.type === 'note');
+      
+      if (childNotes.length === 0) {
+        zip.file('README.txt', 'This folder is empty.');
+      } else {
+        childNotes.forEach(note => {
+          zip.file(`${sanitizeFileName(note.title)}.txt`, note.content || '');
+        });
+      }
+      
+      const blob = zip.generateBlob();
+      downloadFile(`${sanitizeFileName(folder.title)}.zip`, blob);
+      showToast('Folder exported.');
+    }
+    
+    function exportBulkViewAsZip() {
+      const zip = new SimpleZip();
+      const notes = state.items.filter(i => i.type === 'note');
+      const folders = state.items.filter(i => i.type === 'folder');
+      
+      if (notes.length === 0 && folders.length === 0) {
+        showToast('No notes or folders to export');
+        return;
+      }
+      
+      // Loose notes in root
+      notes.filter(n => !n.parentId).forEach(note => {
+        zip.file(`${sanitizeFileName(note.title)}.txt`, note.content || '');
+      });
+      
+      // Folders & sub-items
+      folders.forEach(folder => {
+        const folderName = sanitizeFileName(folder.title);
+        const folderNotes = notes.filter(n => n.parentId === folder.id);
+        if (folderNotes.length === 0) {
+          zip.file(`${folderName}/README.txt`, 'This folder is empty.');
+        } else {
+          folderNotes.forEach(n => {
+            zip.file(`${folderName}/${sanitizeFileName(n.title)}.txt`, n.content || '');
+          });
+        }
+      });
+      
+      const blob = zip.generateBlob();
+      downloadFile('all-notes-backup.zip', blob);
+      showToast('All notes exported.');
+    }
+    
+    /* ==========================================================================
+       Initialization
+       ========================================================================== */
+    document.getElementById('addNoteBtn').addEventListener('click', () => openEditor(null));
+    
+    document.getElementById('addFolderBtn').addEventListener('click', () => {
+      openDialog('New Folder', '', (folderName) => {
+        if (folderName && folderName.trim()) {
+          const newFolder = {
+            id: 'folder_' + Date.now(),
+            type: 'folder',
+            title: folderName.trim(),
+            parentId: state.currentFolderId,
+            pinned: false,
+            updatedAt: new Date().toISOString()
+          };
+          state.items.unshift(newFolder);
+          saveState();
+          render();
+          showToast('Folder created');
+        }
+      });
+    });
+    
+    backBtn.addEventListener('click', () => {
+      const currentFolder = state.items.find(i => i.id === state.currentFolderId);
+      state.currentFolderId = currentFolder ? currentFolder.parentId : null;
+      render();
+    });
+    
+    document.getElementById('bulkExportBtn').addEventListener('click', exportBulkViewAsZip);
+    
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      state.searchQuery = e.target.value;
+      render();
+    });
+    
+    // Start App
+    initStaticIcons();
+    loadState();
+    render();
+  </script>
+</body>
+
+</html>

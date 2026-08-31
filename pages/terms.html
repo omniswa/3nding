@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3NDING — Terms of Use</title>
+  <link rel="preload" href="../fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/worksans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/spacemono.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face {
+      font-family: "Fraunces";
+      src: url("../fonts/fraunces.woff2");
+      font-weight: 300 700;
+      font-display: swap;
+      size-adjust: 100%;
+    }
+    
+    @font-face {
+      font-family: "Work Sans";
+      src: url("../fonts/worksans.woff2");
+      font-weight: 380 550;
+      font-display: swap;
+    }
+    
+    @font-face {
+      font-family: "Space Mono";
+      src: url("../fonts/spacemono.woff2");
+      font-weight: 380 550;
+      font-display: swap;
+    }
+    
+    :root {
+      --ink: #171b21;
+      --paper: #f2e9d3;
+      --brass: #b8923f;
+      --brass-bright: #d4ac57;
+      --moss: #48594f;
+      --text-dark: #2a241c;
+      --text-soft: #5c5342;
+      --text-muted: #9aa2ad;
+      --radius: 2px;
+    }
+    
+    * {
+      box-sizing: border-box;
+    }
+    
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+    
+    body {
+      margin: 0;
+      background: var(--ink);
+      color: var(--text-dark);
+      font-family: 'Work Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--ink);
+      border-bottom: 1px solid rgba(184, 146, 63, .25);
+    }
+    
+    .topbar-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: .85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    
+    .back-link {
+      color: var(--brass-bright);
+      text-decoration: none;
+      font-family: 'Space Mono', monospace;
+      font-size: .78rem;
+      letter-spacing: .04em;
+    }
+    
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    
+    .back-link:focus-visible {
+      outline: 2px solid var(--brass-bright);
+      outline-offset: 2px;
+    }
+    
+    .doc-nav {
+      display: flex;
+      gap: .9rem;
+      font-family: 'Space Mono', monospace;
+      font-size: .72rem;
+      letter-spacing: .03em;
+    }
+    
+    .doc-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    
+    .doc-nav a:hover,
+    .doc-nav a[aria-current="page"] {
+      color: var(--brass-bright);
+    }
+    
+    .sheet {
+      background: var(--paper);
+      max-width: 680px;
+      margin: 0rem auto 3rem;
+      padding: 0 0 1rem;
+      border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 30px -18px rgba(0, 0, 0, .7);
+    }
+    
+    .sheet-head {
+      padding: 2.6rem 2rem 1.6rem;
+      border-bottom: 1px dashed rgba(72, 89, 79, .35);
+    }
+    
+    .eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--moss);
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      margin-bottom: .7rem;
+    }
+    
+    .eyebrow::before {
+      content: "";
+      width: 20px;
+      height: 1px;
+      background: var(--moss);
+      display: inline-block;
+    }
+    
+    h1 {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: clamp(1.7rem, 5.5vw, 2.3rem);
+      line-height: 1.1;
+      margin: 0 0 .6rem;
+      color: var(--text-dark);
+    }
+    
+    .updated {
+      font-family: 'Space Mono', monospace;
+      font-size: .72rem;
+      color: var(--text-soft);
+    }
+    
+    article {
+      padding: 1.8rem 2rem 0;
+      font-size: .96rem;
+      line-height: 1.7;
+      color: var(--text-dark);
+    }
+    
+    article h2 {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 1.15rem;
+      margin: 2.2rem 0 .7rem;
+      color: var(--text-dark);
+    }
+    
+    article h2:first-child {
+      margin-top: 0;
+    }
+    
+    article p {
+      margin: 0 0 1.1em;
+      color: var(--text-soft);
+    }
+    
+    article ul {
+      margin: 0 0 1.1em;
+      padding-left: 1.2em;
+      color: var(--text-soft);
+    }
+    
+    article li {
+      margin-bottom: .4em;
+    }
+    
+    article strong {
+      color: var(--text-dark);
+    }
+    
+    article a {
+      color: var(--text-dark);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(184, 146, 63, .5);
+    }
+    
+    .placeholder {
+      background: rgba(184, 146, 63, .14);
+      border-radius: 2px;
+      padding: 0 .3em;
+    }
+    
+    footer {
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      color: var(--text-muted);
+      padding: 0 1rem 3.2rem;
+    }
+    
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 1px dotted rgba(154, 162, 173, .5);
+    }
+    
+    footer a:hover {
+      color: var(--brass-bright);
+      border-bottom-color: var(--brass-bright);
+    }
+  </style>
+</head>
+
+<body>
+  
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a href="index.html" class="back-link">&larr; archive</a>
+      <nav class="doc-nav" aria-label="Site policies">
+        <a href="about.html">About</a>
+        <a href="terms.html" aria-current="page">Terms</a>
+        <a href="privacy.html">Privacy</a>
+      </nav>
+    </div>
+  </div>
+  
+  <main class="sheet">
+    <div class="sheet-head">
+      <div class="eyebrow">Reading Room Rules</div>
+      <h1>Terms of Use</h1>
+      <div class="updated">Last updated: <span>Month DD, YYYY</span></div>
+    </div>
+    
+    <article>
+      <h2>1. What 3NDING is</h2>
+      <p>
+        3NDING is a small, independently run archive for reading books in the browser.
+        There's no account system beyond your own device — your reading progress,
+        settings, and favorites are stored locally in your browser and never sent
+        to a server.
+      </p>
+      
+      <h2>2. Using the archive</h2>
+      <p>You're welcome to read, browse, and share links to 3NDING freely. In using it, please don't:</p>
+      <ul>
+        <li>Attempt to disrupt, overload, or scrape the site at a scale that affects other readers</li>
+        <li>Use the archive to distribute malware or attempt unauthorized access to its infrastructure</li>
+        <li>Misrepresent your use of the site or impersonate its operator</li>
+      </ul>
+      
+      <h2>3. The books themselves</h2>
+      <p>
+        Titles on 3NDING are included in good faith as
+        <span>public-domain works / properly licensed works</span>.
+        If you believe a work has been included in error or without proper rights, please
+        <a href="about.html">get in touch &nearr;</a> and it will be reviewed and removed if warranted.
+      </p>
+      
+      <h2>4. No warranty</h2>
+      <p>
+        3NDING is provided "as is," maintained on a best-effort basis by one person
+        in their spare time. Titles, features, and availability may
+        change or disappear without notice. We don't guarantee uninterrupted access
+        or that every book will always be readable.
+      </p>
+      
+      <h2>5. Supporting the archive</h2>
+      <p>
+        Donations made through the <a href="support.html">support page &nearr;</a> are voluntary
+        and non-refundable except where required by law. They help cover hosting and
+        upkeep — they don't unlock paid features or create an account relationship.
+      </p>
+      
+      <h2>6. Limitation of liability</h2>
+      <p>
+        To the fullest extent permitted by law, 3NDING and its operator aren't liable
+        for any indirect, incidental, or consequential damages arising from your use of
+        the site.
+      </p>
+      
+      <h2>7. Changes to these terms</h2>
+      <p>
+        These terms may be updated occasionally as the archive grows. The date at the
+        top of this page reflects the most recent revision.
+      </p>
+      
+      <h2>8. Contact</h2>
+      <p>
+        Questions about these terms can go to the address on the
+        <a href="about.html">about &amp; contact page &nearr;</a>.
+      </p>
+    </article>
+  </main>
+  
+  <footer>3NDING — a public archive, lovingly overdue.
+    <a href="support.html">support the archive</a>
+  </footer>
+  
+</body>
+
+</html>

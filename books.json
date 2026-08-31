@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "title": "The Cartographer's Daughter",
+    "author": "Eleanor Whitfield",
+    "cover": "https://picsum.photos/seed/book-cartographers-daughter/600/800",
+    "zip": "books/cartographers-daughter.zip"
+  },
+  {
+    "id": 2,
+    "title": "Letters to a Young Botanist",
+    "author": "H. T. Marwick",
+    "cover": "https://picsum.photos/seed/book-letters-botanist/600/800",
+    "zip": "books/letter-to-a-young-botanist.zip"
+  },
+  {
+    "id": 3,
+    "title": "Of Silent Things",
+    "author": "Yuki Tawara",
+    "cover": "https://picsum.photos/seed/book-silent-things/600/800",
+    "zip": "books/of-silent-things.zip"
+  },
+  {
+    "id": 4,
+    "title": "The Year of Long Afternoons",
+    "author": "Marco Bianchi",
+    "cover": "https://picsum.photos/seed/book-long-afternoons/600/800",
+    "zip": "books/year-of-long-afternoons.zip"
+  },
+  {
+    "id": 5,
+    "title": "Anatomy of a Quiet Room",
+    "author": "Iris Cole",
+    "cover": "https://picsum.photos/seed/book-quiet-room/600/800",
+    "zip": "books/anatomy-of-quiet-room.zip"
+  },
+  {
+    "id": 6,
+    "title": "The Last Lighthouse Keeper",
+    "author": "A. F. Pemberton",
+    "cover": "https://picsum.photos/seed/book-lighthouse-keeper/600/800",
+    "zip": "books/last-lighthouse-keeper.zip"
+  },
+  {
+    "id": 7,
+    "title": "Field Notes from the Edge",
+    "author": "Tobias Lyle",
+    "cover": "https://picsum.photos/seed/book-field-notes-edge/600/800",
+    "zip": "books/fiels-notes-from-the-edge.zip"
+  },
+  {
+    "id": 8,
+    "title": "The Glasshouse Years",
+    "author": "Petra Holm",
+    "cover": "https://picsum.photos/seed/book-glasshouse-years/600/800",
+    "zip": "books/glasshouse-years.zip"
+  },
+  {
+    "id": 9,
+    "title": "Slow Water",
+    "author": "Nadia Okafor",
+    "cover": "https://picsum.photos/seed/book-slow-water/600/800",
+    "zip": "books/slow-waters.zip"
+  },
+  {
+    "id": 10,
+    "title": "A Pocket Book of Hours",
+    "author": "Anonymous",
+    "cover": "https://picsum.photos/seed/book-pocket-hours/600/800",
+    "zip": "books/pocket-book-of-hours.zip"
+  }
+  
+  
+]

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3NDING — Privacy Policy</title>
+  <link rel="preload" href="../fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/worksans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/spacemono.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face {
+      font-family: "Fraunces";
+      src: url("../fonts/fraunces.woff2");
+      font-weight: 300 700;
+      font-display: swap;
+      size-adjust: 100%;
+    }
+    
+    @font-face {
+      font-family: "Work Sans";
+      src: url("../fonts/worksans.woff2");
+      font-weight: 380 550;
+      font-display: swap;
+    }
+    
+    @font-face {
+      font-family: "Space Mono";
+      src: url("../fonts/spacemono.woff2");
+      font-weight: 380 550;
+      font-display: swap;
+    }
+    
+    :root {
+      --ink: #171b21;
+      --paper: #f2e9d3;
+      --brass: #b8923f;
+      --brass-bright: #d4ac57;
+      --moss: #48594f;
+      --text-dark: #2a241c;
+      --text-soft: #5c5342;
+      --text-muted: #9aa2ad;
+      --radius: 2px;
+    }
+    
+    * {
+      box-sizing: border-box;
+    }
+    
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+    
+    body {
+      margin: 0;
+      background: var(--ink);
+      color: var(--text-dark);
+      font-family: 'Work Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--ink);
+      border-bottom: 1px solid rgba(184, 146, 63, .25);
+    }
+    
+    .topbar-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: .85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    
+    .back-link {
+      color: var(--brass-bright);
+      text-decoration: none;
+      font-family: 'Space Mono', monospace;
+      font-size: .78rem;
+      letter-spacing: .04em;
+    }
+    
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    
+    .back-link:focus-visible {
+      outline: 2px solid var(--brass-bright);
+      outline-offset: 2px;
+    }
+    
+    .doc-nav {
+      display: flex;
+      gap: .9rem;
+      font-family: 'Space Mono', monospace;
+      font-size: .72rem;
+      letter-spacing: .03em;
+    }
+    
+    .doc-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    
+    .doc-nav a:hover,
+    .doc-nav a[aria-current="page"] {
+      color: var(--brass-bright);
+    }
+    
+    .sheet {
+      background: var(--paper);
+      max-width: 680px;
+      margin: 0rem auto 3rem;
+      padding: 0 0 1rem;
+      border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 30px -18px rgba(0, 0, 0, .7);
+    }
+    
+    .sheet-head {
+      padding: 2.6rem 2rem 1.6rem;
+      border-bottom: 1px dashed rgba(72, 89, 79, .35);
+    }
+    
+    .eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--moss);
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      margin-bottom: .7rem;
+    }
+    
+    .eyebrow::before {
+      content: "";
+      width: 20px;
+      height: 1px;
+      background: var(--moss);
+      display: inline-block;
+    }
+    
+    h1 {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: clamp(1.7rem, 5.5vw, 2.3rem);
+      line-height: 1.1;
+      margin: 0 0 .6rem;
+      color: var(--text-dark);
+    }
+    
+    .updated {
+      font-family: 'Space Mono', monospace;
+      font-size: .72rem;
+      color: var(--text-soft);
+    }
+    
+    article {
+      padding: 1.8rem 2rem 0;
+      font-size: .96rem;
+      line-height: 1.7;
+      color: var(--text-dark);
+    }
+    
+    article h2 {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 1.15rem;
+      margin: 2.2rem 0 .7rem;
+      color: var(--text-dark);
+    }
+    
+    article h2:first-child {
+      margin-top: 0;
+    }
+    
+    article p {
+      margin: 0 0 1.1em;
+      color: var(--text-soft);
+    }
+    
+    article ul {
+      margin: 0 0 1.1em;
+      padding-left: 1.2em;
+      color: var(--text-soft);
+    }
+    
+    article li {
+      margin-bottom: .4em;
+    }
+    
+    article strong {
+      color: var(--text-dark);
+    }
+    
+    article a {
+      color: var(--text-dark);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(184, 146, 63, .5);
+    }
+    
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 1.4em;
+      font-size: .86rem;
+    }
+    
+    table.data-table th,
+    table.data-table td {
+      text-align: left;
+      padding: .55rem .6rem;
+      border-bottom: 1px dashed rgba(72, 89, 79, .3);
+      vertical-align: top;
+      color: var(--text-soft);
+    }
+    
+    table.data-table th {
+      font-family: 'Space Mono', monospace;
+      font-size: .68rem;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--moss);
+    }
+    
+    footer {
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      color: var(--text-muted);
+      padding: 0 1rem 3.2rem;
+    }
+    
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 1px dotted rgba(154, 162, 173, .5);
+    }
+    
+    footer a:hover {
+      color: var(--brass-bright);
+      border-bottom-color: var(--brass-bright);
+    }
+  </style>
+</head>
+
+<body>
+  
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a href="../index.html" class="back-link">&larr; archive</a>
+      <nav class="doc-nav" aria-label="Site policies">
+        <a href="about.html">About</a>
+        <a href="terms.html">Terms</a>
+        <a href="privacy.html" aria-current="page">Privacy</a>
+      </nav>
+    </div>
+  </div>
+  
+  <main class="sheet">
+    <div class="sheet-head">
+      <div class="eyebrow">What Stays Between Us</div>
+      <h1>Privacy Policy</h1>
+      <div class="updated">Last updated: <span >Month DD, YYYY</span></div>
+    </div>
+    
+    <article>
+      <h2>The short version</h2>
+      <p>
+        3NDING doesn't have user accounts, doesn't run analytics or ad trackers,
+        and doesn't sell or share data — because it barely collects any. Almost
+        everything the site "remembers" about you lives only in your own browser.
+      </p>
+      
+      <h2>What's stored, and where</h2>
+      <p>
+        Reading progress, favorites, and reading settings (font, size, theme) are
+        saved using your browser's local storage. This data:
+      </p>
+      <ul>
+        <li>Stays on your device — it's never transmitted to a server</li>
+        <li>Isn't tied to your name, email, or any identity</li>
+        <li>Can be cleared at any time by clearing your browser's site data, or using the "Reset to defaults" control in Reading Settings</li>
+      </ul>
+      
+      <table class="data-table">
+        <tr>
+          <th>Data</th>
+          <th>Where it lives</th>
+          <th>Purpose</th>
+        </tr>
+        <tr>
+          <td>Favorited titles</td>
+          <td>Browser local storage</td>
+          <td>Show your favorites list</td>
+        </tr>
+        <tr>
+          <td>Reading progress per book</td>
+          <td>Browser local storage</td>
+          <td>Resume where you left off</td>
+        </tr>
+        <tr>
+          <td>Font, size, theme, alignment</td>
+          <td>Browser local storage</td>
+          <td>Remember your reading preferences</td>
+        </tr>
+      </table>
+      
+      <h2>Server logs</h2>
+      <p>
+        Like most web servers, the infrastructure hosting 3NDING may keep basic
+        technical logs (such as IP address, browser type, and page requested) for
+        a short period, purely to keep the service running and to catch abuse. </p>
+      
+      <h2>Cookies</h2>
+      <p>
+        3NDING itself doesn't set cookies. If you visit the
+        <a href="support.html" >support page &nearr;</a> and choose to donate, the payment
+        provider you're redirected to will handle
+        that transaction under its own privacy policy — 3NDING never sees your
+        payment details.
+      </p>
+      
+      <h2>Third parties</h2>
+      <p>
+        Fonts and book files are served directly from 3NDING's own infrastructure.
+        The only third party involved is the payment provider on the support page,
+        and only if you choose to use it.
+      </p>
+      
+      <h2>Children's privacy</h2>
+      <p>
+        3NDING isn't directed at children and doesn't knowingly collect personal
+        information from anyone, of any age, since it doesn't collect personal
+        information at all.
+      </p>
+      
+      <h2>Changes to this policy</h2>
+      <p>
+        If what 3NDING stores or how it's stored ever changes, this page will be
+        updated and the date above will reflect that.
+      </p>
+      
+      <h2>Contact</h2>
+      <p>
+        Questions about this policy can go to the address on the
+        <a href="about.html" >about &amp; contact page &nearr;</a>.
+      </p>
+    </article>
+  </main>
+  
+  <footer>3NDING — a public archive, lovingly overdue. <a href="support.html">support the archive</a></footer>
+  
+</body>
+
+</html>

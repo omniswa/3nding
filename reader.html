@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3NDING — Reader</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <link rel="stylesheet" href="styles/reader.css">
+  <link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/worksans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/spacemono.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/literata.woff2" as="font" type="font/woff2" crossorigin>
+  
+</head>
+
+<body class="theme-paper">
+  
+  <div class="topbar">
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="topbar-inner">
+      <a href="index.html" class="back-link" id="backLink">archive</a>
+      <div class="topbar-title" id="topbarTitle">Loading…</div>
+      <div class="progress-pct" id="progressPct">0%</div>
+      <button class="settings-btn" id="settingsBtn" aria-label="Reading settings" aria-expanded="false">&#9881;</button>
+    </div>
+  </div>
+  
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer" aria-label="Reading settings">
+    <div class="drawer-head">
+      <h2>Reading settings</h2>
+      <button class="drawer-close" id="drawerCloseBtn" aria-label="Close settings">&#10005;</button>
+    </div>
+    
+    <div class="setting-group">
+      <span class="setting-label">Font</span>
+      <div class="option-row" id="fontRow" data-key="font">
+        <button class="opt-btn" data-value="serif">Serif</button>
+        <button class="opt-btn" data-value="sans">Sans</button>
+        <button class="opt-btn" data-value="mono">Mono</button>
+      </div>
+    </div>
+    
+    <div class="setting-group">
+      <span class="setting-label">Text size</span>
+      <div class="size-row">
+        <button class="opt-btn" id="sizeDown" aria-label="Decrease text size">A-</button>
+        <span class="size-value" id="sizeValue">17</span>
+        <button class="opt-btn" id="sizeUp" aria-label="Increase text size">A+</button>
+      </div>
+    </div>
+    
+    <div class="setting-group">
+      <span class="setting-label">Alignment</span>
+      <div class="option-row" id="alignRow" data-key="align">
+        <button class="opt-btn" data-value="left">Left</button>
+        <button class="opt-btn" data-value="justify">Justify</button>
+      </div>
+    </div>
+    
+    <div class="setting-group">
+      <span class="setting-label">Theme</span>
+      <div class="option-row" id="themeRow" data-key="theme">
+        <button class="opt-btn" data-value="paper">Paper</button>
+        <button class="opt-btn" data-value="sepia">Sepia</button>
+        <button class="opt-btn" data-value="dark">Dark</button>
+      </div>
+    </div>
+    
+    <button class="reset-btn" id="resetBtn">Reset to defaults</button>
+    
+    <a href="pages/support.html" class="drawer-support-link">Support the archive &rarr;</a>
+  </aside>
+  
+  <div class="reader-surface" id="readerSurface">
+    <div class="state-box" id="stateBox"><span class="dot"></span> Opening the book…</div>
+  </div>
+  
+  <script src="scripts/reader.js" defer></script>
+</body>
+
+</html>

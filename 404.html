@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>404 | Page Not Found</title>
+  <meta name="robots" content="noindex, follow">
+
+  <!-- Preload Critical Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="logo.png">
+
+  <style>
+    :root {
+      /* Light Mode */
+      --bg-body: #F9FAFB;
+      --bg-card: #FFFFFF;
+      --bg-header: rgba(255, 255, 255, 0.85);
+      --text-main: #111827;
+      --text-muted: #6B7280;
+      --accent: #2563EB;
+      --border: #E5E7EB;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --radius: 12px;
+      --transition: all 0.3s ease;
+    }
+
+    /* --- RESET & BASE STYLES --- */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Play', sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      line-height: 1.6;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      min-height: 100dvh;
+      display: grid;
+      align-content: center;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+      transition: var(--transition);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+
+      width: 100%;
+    }
+
+    /* --- 404 SPECIFIC STYLES --- */
+    .error-content {
+      flex: 1;
+      display: flex;
+      padding: 0 4rem;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+
+    }
+
+    .error-code {
+      font-size: 8rem;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 1rem;
+      opacity: 0.9;
+    }
+
+    .error-title {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--text-main);
+    }
+
+    .error-desc {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      max-width: 500px;
+      margin-bottom: 2.5rem;
+    }
+
+    .btn-home {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--text-main);
+      color: var(--bg-body);
+      padding: 0.8rem 2rem;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: var(--transition);
+      box-shadow: var(--shadow);
+    }
+
+    .btn-home:hover {
+      transform: translateY(-2px);
+      background-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 6px 12px rgba(37, 99, 235, 0.2);
+    }
+
+    /* Animation */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      .error-code {
+        font-size: 5rem;
+      }
+
+      .error-title {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('3nding_theme');
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      const theme = savedTheme || systemTheme;
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+
+<body>
+  <!-- Main 404 Content -->
+  <main class="container error-content fade-in">
+    <div class="error-code">404</div>
+    <h1 class="error-title">Page Not Found</h1>
+    <p class="error-desc">The story you are looking for has been moved or no longer exists. Let's get you back to the beginning.</p>
+    <a href="#" class="btn-home to-home">Back to Home</a>
+  </main>
+  <script>
+    const homeUrl = new URL(window.location.href);
+    const toHome = document.querySelectorAll('.to-home');
+    toHome.forEach(btn => {
+      btn.href = homeUrl.origin;
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3NDING — About &amp; Contact</title>
+  <link rel="preload" href="../fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/worksans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/spacemono.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face {
+      font-family: "Fraunces";
+      src: url("../fonts/fraunces.woff2");
+      font-weight: 300 700;
+      font-display: swap;
+      size-adjust: 100%;
+    }
+    
+    @font-face {
+      font-family: "Work Sans";
+      src: url("../fonts/worksans.woff2");
+      font-weight: 380 550;
+      font-display: swap;
+    }
+    
+    @font-face {
+      font-family: "Space Mono";
+      src: url("../fonts/spacemono.woff2");
+      font-weight: 380 550;
+      font-display: swap;
+    }
+    
+    :root {
+      --ink: #171b21;
+      --paper: #f2e9d3;
+      --brass: #b8923f;
+      --brass-bright: #d4ac57;
+      --moss: #48594f;
+      --text-dark: #2a241c;
+      --text-soft: #5c5342;
+      --text-muted: #9aa2ad;
+      --radius: 2px;
+    }
+    
+    * {
+      box-sizing: border-box;
+    }
+    
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+    
+    body {
+      margin: 0;
+      background: var(--ink);
+      color: var(--text-dark);
+      font-family: 'Work Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--ink);
+      border-bottom: 1px solid rgba(184, 146, 63, .25);
+    }
+    
+    .topbar-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: .85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    
+    .back-link {
+      color: var(--brass-bright);
+      text-decoration: none;
+      font-family: 'Space Mono', monospace;
+      font-size: .78rem;
+      letter-spacing: .04em;
+    }
+    
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    
+    .back-link:focus-visible {
+      outline: 2px solid var(--brass-bright);
+      outline-offset: 2px;
+    }
+    
+    .doc-nav {
+      display: flex;
+      gap: .9rem;
+      font-family: 'Space Mono', monospace;
+      font-size: .72rem;
+      letter-spacing: .03em;
+    }
+    
+    .doc-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    
+    .doc-nav a:hover,
+    .doc-nav a[aria-current="page"] {
+      color: var(--brass-bright);
+    }
+    
+    .sheet {
+      background: var(--paper);
+      max-width: 680px;
+      margin: 0 auto 3rem;
+      padding: 0 0 1rem;
+      border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 30px -18px rgba(0, 0, 0, .7);
+    }
+    
+    .sheet-head {
+      padding: 2.6rem 2rem 1.6rem;
+      border-bottom: 1px dashed rgba(72, 89, 79, .35);
+    }
+    
+    .eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--moss);
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      margin-bottom: .7rem;
+    }
+    
+    .eyebrow::before {
+      content: "";
+      width: 20px;
+      height: 1px;
+      background: var(--moss);
+      display: inline-block;
+    }
+    
+    h1 {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: clamp(1.7rem, 5.5vw, 2.3rem);
+      line-height: 1.1;
+      margin: 0 0 .6rem;
+      color: var(--text-dark);
+    }
+    
+    .sheet-head p {
+      max-width: 46ch;
+      color: var(--text-soft);
+      font-size: .96rem;
+      line-height: 1.6;
+      margin: 0;
+    }
+    
+    article {
+      padding: 1.8rem 2rem 0;
+      font-size: .96rem;
+      line-height: 1.7;
+      color: var(--text-dark);
+    }
+    
+    article h2 {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 1.15rem;
+      margin: 2.2rem 0 .7rem;
+      color: var(--text-dark);
+    }
+    
+    article h2:first-child {
+      margin-top: 0;
+    }
+    
+    article p {
+      margin: 0 0 1.1em;
+      color: var(--text-soft);
+    }
+    
+    article strong {
+      color: var(--text-dark);
+    }
+    
+    article a {
+      color: var(--text-dark);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(184, 146, 63, .5);
+    }
+    
+    .placeholder {
+      background: rgba(184, 146, 63, .14);
+      border-radius: 2px;
+      padding: 0 .3em;
+    }
+    
+    /* ---- Contact card ---- */
+    .contact-card {
+      margin: 0 2rem 1.8rem;
+      padding: 1.2rem 1.3rem;
+      background: rgba(184, 146, 63, .08);
+      border: 1px solid rgba(184, 146, 63, .3);
+      border-radius: var(--radius);
+    }
+    
+    .contact-row {
+      display: flex;
+      align-items: baseline;
+      gap: .7rem;
+      padding: .5rem 0;
+      border-bottom: 1px dashed rgba(72, 89, 79, .25);
+    }
+    
+    .contact-row:last-child {
+      border-bottom: none;
+    }
+    
+    .contact-label {
+      font-family: 'Space Mono', monospace;
+      font-size: .68rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--moss);
+      width: 6.5em;
+      flex-shrink: 0;
+    }
+    
+    .contact-value a {
+      color: var(--text-dark);
+      text-decoration: none;
+      border-bottom: 1px dotted var(--brass);
+    }
+    
+    .contact-value a:hover {
+      color: var(--brass);
+    }
+    
+    footer {
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      color: var(--text-muted);
+      padding: 0 1rem 3.2rem;
+    }
+    
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 1px dotted rgba(154, 162, 173, .5);
+    }
+    
+    footer a:hover {
+      color: var(--brass-bright);
+      border-bottom-color: var(--brass-bright);
+    }
+  </style>
+</head>
+
+<body>
+  
+  <div class="topbar">
+    <div class="topbar-inner">
+      <a href="../index.html" class="back-link">&larr; archive</a>
+      <nav class="doc-nav" aria-label="Site policies">
+        <a href="about.html" aria-current="page">About</a>
+        <a href="terms.html">Terms</a>
+        <a href="privacy.html">Privacy</a>
+      </nav>
+    </div>
+  </div>
+  
+  <main class="sheet">
+    <div class="sheet-head">
+      <div class="eyebrow">The Keeper's Desk</div>
+      <h1>About &amp; Contact</h1>
+      <p>
+        3NDING is a small, independently run archive for reading books
+        in the browser — no accounts, no ads, no algorithm deciding what
+        you read next. Just a shelf.
+      </p>
+    </div>
+    
+    <article>
+      <h2>Who's behind it</h2>
+      <p>
+        3NDING is built and kept up by
+        <span>yours truly</span>,
+        <span>a reader who wanted a
+          quieter place to read and discover books.</span>
+      </p>
+      
+      <h2>Get in touch</h2>
+      <p>
+        Found a broken chapter, a typo, or a book that shouldn't be here?
+        Have a title you think belongs on the shelf? Reach out below.
+      </p>
+    </article>
+    
+    <div class="contact-card">
+      <div class="contact-row">
+        <span class="contact-label">Email</span>
+        <span class="contact-value"><a href="mailto:hello@example.com">hello@example.com</a></span>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label">Reports</span>
+        <span class="contact-value"><a href="mailto:hello@example.com?subject=3NDING%20issue">Report a broken book or bug</a></span>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label">Elsewhere</span>
+        <span class="contact-value"><a href="#">@telegram</a></span>
+      </div>
+    </div>
+    
+    <article>
+      <h2>Response time</h2>
+      <p>
+        This is a one-person(ish) operation run alongside everything else in
+        life, so replies may take a few days. Every message is read.
+      </p>
+      
+      <h2>Related pages</h2>
+      <p>
+        For how the archive handles your data, see the
+        <a href="privacy.html">privacy policy &nearr;</a>. For the ground rules of
+        using the site, see the <a href="terms.html">terms of use&nearr;</a>. And if
+        3NDING's been useful to you, you can
+        <a href="support.html">help keep it running &nearr;</a>.
+      </p>
+    </article>
+  </main>
+  
+  <footer>3NDING — a public archive, lovingly overdue. <a href="support.html">support the archive</a></footer>
+  
+</body>
+
+</html>

@@ -1,0 +1,612 @@
+@font-face {
+  font-family: "Literata";
+  src: url("../fonts/literata.woff2");
+  font-weight: 300 700;
+  font-display: swap;
+  size-adjust: 100%;
+}
+
+:root {
+  --bg: #F7F5EC;
+  --bg-alt: #EFEBDD;
+  --ink: #1F2A20;
+  --ink-soft: #4B5A4C;
+  --accent: #9C7A00;
+  --accent-deep: #7C5C00;
+  --line: #D8D2BE;
+  --white: #FFFDF8;
+  --font: "Literata", serif;
+  --max: 42rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  font-family: "Literata";
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+svg {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: var(--accent-deep);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--ink);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wrap {
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+/* -------- Header -------- */
+.site-header {
+  margin-bottom: 3rem;
+  border-bottom: 1px solid var(--line);
+  padding-block: 0.9rem;
+}
+
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.brand:hover {
+  color: var(--accent-deep);
+}
+
+.btn {
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--white);
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.btn-ghost:hover {
+  background: var(--bg-alt);
+  color: var(--ink);
+}
+
+/* -------- Article header -------- */
+h1 {
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+}
+
+.byline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 1.5rem;
+}
+
+.byline .dot {
+  opacity: 0.5;
+}
+
+/* -------- Article body -------- */
+article :is(h2, h3) {
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin: 2.25rem 0 0.75rem;
+}
+
+h3 {
+  font-size: 1.15rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+p {
+  margin: 0 0 1.1rem;
+}
+
+article p,
+article li {
+  max-width: 65ch;
+}
+
+hr {
+  border: 0;
+  height: 22px;
+  margin: 2.5rem 0;
+  background: no-repeat center / 20px 20px url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="%239C7A00"/><circle cx="4" cy="12" r="2" fill="%23D8D2BE"/><circle cx="20" cy="12" r="2" fill="%23D8D2BE"/></svg>');
+  position: relative;
+}
+
+hr::before,
+hr::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: calc(50% - 18px);
+  border-top: 1px solid var(--line);
+}
+
+hr::before {
+  left: 0;
+}
+
+hr::after {
+  right: 0;
+}
+
+.styled-list {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+}
+
+.styled-list li {
+  position: relative;
+  padding-left: 1.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.styled-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.55em;
+  height: 0.55em;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.step-list {
+  list-style: none;
+  counter-reset: step;
+  margin: 0 0 1.25rem;
+  padding: 0;
+}
+
+.step-list li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 2.75rem;
+  margin-bottom: 1.1rem;
+}
+
+.step-list li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--white);
+  background: var(--ink);
+  border-radius: 50%;
+}
+
+.step-list strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+blockquote {
+  margin: 1.75rem 0;
+  padding: 0.25rem 0 0.25rem 1.1rem;
+  border-left: 3px solid var(--accent);
+  font-style: italic;
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+}
+
+.table-wrap {
+  margin: 1.5rem 0 2rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 639px) {
+  
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td {
+    display: block;
+    width: 100%;
+  }
+  
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  
+  tbody tr {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  tbody td {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px dashed var(--line);
+    text-align: right;
+  }
+  
+  tbody td:last-child {
+    border-bottom: 0;
+  }
+  
+  tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-align: left;
+  }
+}
+
+@media (min-width: 640px) {
+  .table-wrap {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  
+  thead th {
+    text-align: left;
+    background: var(--bg-alt);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 0.75rem 1rem;
+  }
+  
+  tbody td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--line);
+  }
+  
+  tbody tr:nth-child(even) {
+    background: var(--bg-alt);
+  }
+}
+
+
+footer {
+  text-align: center;
+  border-top: 1px solid var(--line);
+  margin-top: 3rem;
+  padding: 1rem;
+  padding-bottom: 4rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 480px) {
+  .site-header .wrap {
+    gap: 0.5rem;
+  }
+  
+  .btn {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* -------- Telegram callout -------- */
+.telegram-cta {
+  display: grid;
+  margin: 2.75rem 0 1rem;
+  padding: 1.5rem;
+  background: var(--ink);
+  border-radius: 14px;
+  gap: 1.1rem;
+}
+
+.telegram-cta__body h3 {
+  color: var(--white);
+  margin: 0 0 0.2rem;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.telegram-cta__body p {
+  color: #C9D2CA;
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+}
+
+.telegram-cta__body .btn {
+  padding: 0.8rem;
+  display: grid;
+  text-align: center;
+  text-decoration: none;
+  background: transparent;
+  border-color: var(--accent);
+  color: white;
+}
+
+.telegram-cta__body .btn:hover {
+  background: var(--white);
+  border-color: var(--white);
+  color: black;
+}
+
+/* -------- Floating pill nav -------- */
+.pill-nav {
+  gap: 0.3rem;
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  background: var(--ink);
+  color: var(--white);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(31, 42, 32, 0.28);
+  padding: 0.3rem;
+  max-width: calc(100vw - 1.5rem);
+}
+
+.pill-nav__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pill-nav__btn:hover {
+  background: rgba(255, 253, 248, 0.12);
+}
+
+.pill-nav__btn svg {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.pill-nav__label {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill-nav__divider {
+  width: 1px;
+  background: rgba(255, 253, 248, 0.18);
+  margin-block: 0.4rem;
+}
+
+/* Icon-only on narrow viewports so the pill never overflows the screen */
+@media (max-width: 639px) {
+  .pill-nav__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  
+  .pill-nav__btn {
+    padding: 0.65rem;
+  }
+}
+
+/* -------- TOC modal -------- */
+.toc-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 42, 32, 0.45);
+  z-index: 50;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.toc-backdrop.is-open {
+  display: flex;
+}
+
+.toc-modal {
+  background: var(--white);
+  width: 100%;
+  max-width: 30rem;
+  border-radius: 18px 18px 0 0;
+  padding: 1.5rem 1.5rem 2rem;
+  max-height: 75vh;
+  overflow-y: auto;
+  box-shadow: 0 -10px 30px rgba(31, 42, 32, 0.2);
+}
+
+@media (min-width: 640px) {
+  .toc-backdrop {
+    align-items: center;
+    padding: 1.5rem;
+  }
+  
+  .toc-modal {
+    border-radius: 16px;
+    max-height: 80vh;
+  }
+}
+
+.toc-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.toc-modal__head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.toc-modal__close {
+  appearance: none;
+  border: 0;
+  background: var(--bg-alt);
+  color: var(--ink);
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.toc-modal__close svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.toc-list button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-size: 0.98rem;
+  color: var(--ink);
+  padding: 0.85rem 0.4rem;
+  cursor: pointer;
+}
+
+.toc-list button:hover {
+  background: var(--bg-alt);
+}
+
+.toc-list button[aria-current="true"] {
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+/* -------- Share toast -------- */
+.share-toast {
+  position: fixed;
+  left: 50%;
+  top: 5rem;
+  transform: translateX(-50%) translateY(0.4rem);
+  z-index: 60;
+  background: var(--ink);
+  color: var(--white);
+  font-size: 0.85rem;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.share-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .share-toast {
+    transition: none;
+  }
+}

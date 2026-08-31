@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blog Post Generator</title>
+  <link rel="stylesheet" href="../styles/blog.css">
+  
+  <!-- Marked.js CDN for Markdown Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
+  <style>
+    .site-header {
+      margin-bottom: 0 !important;
+    }
+    
+    /* Generator UI enhancements complementing blog.css */
+    .generator-wrap {
+      max-width: 54rem;
+      margin-inline: auto;
+    }
+    
+    .form-card,
+    .output-card {
+      padding: 2rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+      display: block;
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 0.45rem;
+      color: var(--ink);
+    }
+    
+    .form-hint {
+      font-size: 0.82rem;
+      color: var(--ink-soft);
+      margin-top: 0.35rem;
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      font-family: inherit;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .form-control:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(156, 122, 0, 0.18);
+      background: var(--white);
+    }
+    
+    textarea.form-control {
+      min-height: 150px;
+      font-family: monospace, serif;
+      font-size: 0.9rem;
+    }
+    
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+    }
+    
+    .btn {
+      padding: 1rem;
+    }
+    
+    .code-block-wrap {
+      position: relative;
+      margin-top: 1rem;
+    }
+    
+    pre.code-preview {
+      background: var(--ink);
+      color: var(--white);
+      padding: 1.25rem;
+      border-radius: 10px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      margin: 0;
+      font-family: monospace;
+    }
+    
+    .btn-copy {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.6rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+      background: rgba(255, 253, 248, 0.15);
+      border: 1px solid rgba(255, 253, 248, 0.25);
+      color: var(--white);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    
+    .btn-copy:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+
+<body>
+  
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="#">[3NDING] • GENERATOR</a>
+    </div>
+  </header>
+  
+  <main class="generator-wrap">
+    
+    <form id="generator-form" class="form-card" novalidate>
+      <!-- Title -->
+      <div class="form-group">
+        <label for="post-title">Post Title *</label>
+        <input type="text" id="post-title" class="form-control" placeholder="e.g. How to Build a Minimalist Blog" required>
+      </div>
+      
+      <!-- Meta Description -->
+      <div class="form-group">
+        <label for="meta-desc">Meta Description *</label>
+        <textarea id="meta-desc" class="form-control" style="min-height: 80px;" placeholder="150–160 character summary of the post..." required></textarea>
+        <div class="form-hint" id="char-counter">0 / 160 characters</div>
+      </div>
+      
+      <!-- Markdown Content -->
+      <div class="form-group">
+        <label for="markdown-content">Content (Markdown) *</label>
+        <textarea id="markdown-content" class="form-control" placeholder="Write your post content using Markdown here...
+
+## Section Title
+Your text goes here.
+" required></textarea>
+        <div class="form-hint">Supports full standard Markdown.</div>
+      </div>
+      
+      <!-- Actions -->
+      <div class="btn-row">
+        <button type="submit" class="btn">Download HTML</button>
+        <button type="button" id="btn-clear" class="btn btn-ghost">Clear Form</button>
+      </div>
+    </form>
+    
+    <!-- JSON Output Section -->
+    <section class="output-card" style="border-top: 1px solid var(--line);">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <h2 style="font-size: 1.2rem; margin: 0;">Index Record (JSON)</h2>
+      </div>
+      
+      <div class="code-block-wrap">
+        <button type="button" class="btn-copy" id="btn-copy-json">Copy JSON</button>
+        <pre class="code-preview"><code id="json-output">{
+  title: "",
+  excerpt: "",
+  link: ""
+}</code></pre>
+      </div>
+    </section>
+  </main>
+  
+  <div class="share-toast" id="share-toast" role="status" aria-live="polite"></div>
+  
+  <script>
+    (function() {
+      const form = document.getElementById('generator-form');
+      const titleInput = document.getElementById('post-title');
+      const metaInput = document.getElementById('meta-desc');
+      const contentInput = document.getElementById('markdown-content');
+      const charCounter = document.getElementById('char-counter');
+      const jsonOutput = document.getElementById('json-output');
+      const btnCopyJson = document.getElementById('btn-copy-json');
+      const btnClear = document.getElementById('btn-clear');
+      const shareToast = document.getElementById('share-toast');
+      
+      const currentOrigin = (window.location.origin && window.location.origin !== 'null') ?
+        window.location.origin :
+        'https://example.com';
+      
+      const currentYear = new Date().getFullYear();
+      
+      // Show temporary toast message
+      let toastTimer;
+      
+      function showToast(msg) {
+        shareToast.textContent = msg;
+        shareToast.classList.add('is-visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          shareToast.classList.remove('is-visible');
+        }, 2200);
+      }
+      
+      // Generate clean URL slug from title
+      function slugify(text) {
+        return text
+          .toString()
+          .toLowerCase()
+          .trim()
+          .replace(/[\s\W-]+/g, '-')
+          .replace(/^-+|-+$/g, '') || 'post';
+      }
+      
+      // Update character count, slug preview, and JSON snippet in real-time
+      function updatePreviews() {
+        const title = titleInput.value.trim();
+        const meta = metaInput.value.trim();
+        const slug = slugify(title);
+        const relativeLink = `blogs/${currentYear}/${slug}.html`;
+        
+        charCounter.textContent = `${meta.length} / 160 characters`;
+        
+        const jsonObject = {
+          title: title || "Blog Title",
+          excerpt: meta || "Details of the article",
+          link: relativeLink
+        };
+        
+        jsonOutput.textContent = JSON.stringify(jsonObject, null, 2);
+      }
+      
+      // Markdown Post-Processing: Table wrapping & Data-labels + External link detection
+      function processMarkdownHtml(rawHtml) {
+        const temp = document.createElement('div');
+        temp.innerHTML = rawHtml;
+        
+        // 1. External Links: Target & Rel detection
+        temp.querySelectorAll('a').forEach(a => {
+          const href = a.getAttribute('href') || '';
+          if (/^https?:\/\//i.test(href)) {
+            try {
+              const url = new URL(href, window.location.href);
+              if (url.origin !== window.location.origin) {
+                a.setAttribute('target', '_blank');
+                a.setAttribute('rel', 'nofollow noopener');
+              }
+            } catch (e) {
+              a.setAttribute('target', '_blank');
+              a.setAttribute('rel', 'nofollow noopener');
+            }
+          }
+        });
+        
+        // 2. Tables: Add data-label to td for mobile layout and wrap in .table-wrap
+        temp.querySelectorAll('table').forEach(table => {
+          const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+          
+          table.querySelectorAll('tbody tr').forEach(tr => {
+            Array.from(tr.children).forEach((td, index) => {
+              if (headers[index]) {
+                td.setAttribute('data-label', headers[index]);
+              }
+            });
+          });
+          
+          const wrapper = document.createElement('div');
+          wrapper.className = 'table-wrap';
+          table.parentNode.insertBefore(wrapper, table);
+          wrapper.appendChild(table);
+        });
+        
+        return temp.innerHTML;
+      }
+      
+      // Generate complete downloadable HTML document
+      function buildHtmlDocument(title, meta, markdown) {
+        const slug = slugify(title);
+        const parsedBody = processMarkdownHtml(marked.parse(markdown));
+        
+        const now = new Date();
+        const isoDate = now.toISOString().split('T')[0];
+        const formattedDate = now.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        
+        const wordCount = (markdown.trim().match(/\S+/g) || []).length;
+        const readTime = Math.max(1, Math.ceil(wordCount / 200));
+        
+        return `<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title} | 3NDING</title>
+  <meta name="description" content="${meta}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${currentOrigin}/blog/${slug}">
+  
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${meta}">
+  <meta property="og:url" content="${currentOrigin}/blog/${slug}">
+  <meta property="og:site_name" content="3NDING">
+  <meta property="og:image" content="${currentOrigin}/images/${slug}.webp">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${meta}">
+  
+  <meta name="theme-color" content="#F7F5EC">
+  
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "${title.replace(/"/g, '\\"')}",
+      "description": "${meta.replace(/"/g, '\\"')}",
+      "datePublished": "${isoDate}",
+      "dateModified": "${isoDate}",
+      "author": { "@type": "Person", "name": "omniswa" },
+      "publisher": {
+        "@type": "Organization",
+        "name": "3NDING"
+      },
+      "mainEntityOfPage": "${currentOrigin}/blog/${slug}"
+    }
+  <\/script>
+  
+  <link rel="preload" href="../fonts/literata.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../styles/blog.css">
+</head>
+
+<body>
+  
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="#top">3NDING</a>
+      <button class="btn" type="button" data-open-modal>Read Book</button>
+    </div>
+  </header>
+  
+  <main id="top">
+    <div class="wrap">
+      <article>
+        <header>
+          <h1>${title}</h1>
+          <p class="byline">
+            <span>By omniswa</span>
+            <span class="dot">·</span>
+            <span>${formattedDate}</span>
+            <span class="dot">·</span>
+            <span>${readTime} min read</span>
+          </p>
+        </header>
+        
+        ${parsedBody}
+        
+        <div class="telegram-cta">
+          <div class="telegram-cta__body">
+            <h3>Get new posts on Telegram</h3>
+            <p>Join the channel for early access to new guides and quick updates.</p>
+            <a class="btn" href="https://t.me/[your-channel]" target="_blank" rel="noopener">Join the channel</a>
+          </div>
+        </div>
+        
+      </article>
+    </div>
+  </main>
+  
+  <footer>
+    <p>© <span id="current-year"></span> • 3NDING • ALL RIGHTS RESERVED</p>
+  </footer>
+  
+  <!-- Floating bottom pill: back to top / table of contents / share -->
+  <nav class="pill-nav" aria-label="Page navigation">
+    <button class="pill-nav__btn" type="button" data-action="top" aria-label="Back to top">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span class="pill-nav__label">Top</span>
+    </button>
+    
+    <span class="pill-nav__divider" aria-hidden="true"></span>
+    
+    <button class="pill-nav__btn" type="button" data-action="toc" aria-haspopup="dialog" aria-expanded="false" aria-controls="toc-backdrop">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span class="pill-nav__label" data-toc-label>Contents</span>
+    </button>
+    
+    <span class="pill-nav__divider" aria-hidden="true"></span>
+    
+    <button class="pill-nav__btn" type="button" data-action="share" aria-label="Share this post">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="18" cy="5" r="2.5" stroke="currentColor" stroke-width="2" />
+        <circle cx="6" cy="12" r="2.5" stroke="currentColor" stroke-width="2" />
+        <circle cx="18" cy="19" r="2.5" stroke="currentColor" stroke-width="2" />
+        <path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
+      <span class="pill-nav__label">Share</span>
+    </button>
+  </nav>
+  
+  <!-- Table of contents modal -->
+  <div class="toc-backdrop" id="toc-backdrop">
+    <div class="toc-modal" role="dialog" aria-modal="true" aria-labelledby="toc-modal-title">
+      <div class="toc-modal__head">
+        <h2 id="toc-modal-title">Table of contents</h2>
+        <button class="toc-modal__close" type="button" data-action="toc-close" aria-label="Close table of contents">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+      <ul class="toc-list" id="toc-list"></ul>
+    </div>
+  </div>
+  
+  <div class="share-toast" id="share-toast" role="status" aria-live="polite"></div>
+  
+  <script src="../scripts/blog.js" defer><\/script>
+</body>
+</html>`;
+      }
+      
+      // Download file triggered via Blob
+      function triggerDownload(fileName, content) {
+        const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      
+      // Realtime listeners
+      titleInput.addEventListener('input', updatePreviews);
+      metaInput.addEventListener('input', updatePreviews);
+      contentInput.addEventListener('input', updatePreviews);
+      
+      // Form submission & validation
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const title = titleInput.value.trim();
+        const meta = metaInput.value.trim();
+        const markdown = contentInput.value.trim();
+        
+        if (!title || !meta || !markdown) {
+          showToast('Fill out fields');
+          return;
+        }
+        
+        const slug = slugify(title);
+        const fileName = `${slug}.html`;
+        const generatedHtml = buildHtmlDocument(title, meta, markdown);
+        
+        triggerDownload(fileName, generatedHtml);
+        showToast(`File downloaded`);
+      });
+      
+      // Clear Form Function
+      btnClear.addEventListener('click', function() {
+        if (confirm('Clear the form?')) {
+          form.reset();
+          updatePreviews();
+          showToast('Form cleared');
+        }
+      });
+      
+      // Copy JSON button
+      btnCopyJson.addEventListener('click', function() {
+        const text = jsonOutput.textContent;
+        navigator.clipboard.writeText(text)
+          .then(() => showToast('JSON copied'))
+          .catch(() => showToast('Failed to copy'));
+      });
+      
+      // Initial run
+      updatePreviews();
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3NDING — Books Archive</title>
+  <link rel="stylesheet" href="styles/index.css">
+  <link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/worksans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/spacemono.woff2" as="font" type="font/woff2" crossorigin>
+  
+</head>
+
+<body>
+  
+  <header>
+    <div class="eyebrow">Books Archive</div>
+    <h1>3NDING</h1>
+    <p class="sub">Explore a growing library of stories and dive into your next great read.</p>
+  </header>
+  
+  <main>
+    <button type="button" class="controls-toggle" id="controlsToggle" aria-expanded="false" aria-controls="drawer">
+      <span aria-hidden="true">&#9776;</span> Browse &amp; filter
+    </button>
+    
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+    <aside class="drawer" id="drawer" aria-label="Browse and filter the archive">
+      <div class="drawer-head">
+        <h2>Browse</h2>
+        <button type="button" class="drawer-close" id="drawerCloseBtn" aria-label="Close browse panel">&#10005;</button>
+      </div>
+      
+      <div class="archive-status" id="status" role="status" aria-live="polite">
+        <span class="dot"></span> Cataloging the archive…
+      </div>
+      
+      <div class="search-row" id="searchRow" hidden>
+        <label class="setting-label" for="searchInput">Search</label>
+        <input type="search" id="searchInput" class="search-input" placeholder="Title or author…" aria-label="Search by title or author">
+      </div>
+      
+      <div class="fav-row" id="favRow" hidden>
+        <span class="setting-label">Favorites</span>
+        <button type="button" class="opt-btn fav-toggle" id="favToggle" aria-pressed="false">
+          <span id="favToggleIcon" aria-hidden="true">&#9825;</span>
+          <span>Favorites only</span>
+          <span class="fav-count" id="favCount">0</span>
+        </button>
+      </div>
+    </aside>
+    
+    <div class="content">
+      <p class="no-results" id="noResults" hidden></p>
+      <div class="grid" id="grid"></div>
+      <nav class="pagination" id="pagination" hidden aria-label="Book pages">
+        <button type="button" class="nav-btn" id="prevPageBtn">Prev</button>
+        <span class="page-status" id="pageStatus" aria-live="polite">Page 1 of 1</span>
+        <button type="button" class="nav-btn" id="nextPageBtn">Next</button>
+      </nav>
+    </div>
+  </main>
+  
+  <footer>3NDING — a public archive, lovingly overdue.
+    <a href="pages/support.html" class="footer-link">support the archive</a>
+    <span aria-hidden="true">·</span> <a href="pages/about.html" class="footer-link">about</a>
+    <span aria-hidden="true">·</span> <a href="pages/terms.html" class="footer-link">terms</a>
+    <span aria-hidden="true">·</span> <a href="pages/privacy.html" class="footer-link">privacy</a>
+  </footer>
+  
+  <script src="scripts/index.js" defer></script>
+  
+</body>
+
+</html>
