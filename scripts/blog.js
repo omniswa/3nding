@@ -176,5 +176,5 @@
    // Get the full 4-digit year from the system clock
    const year = new Date().getFullYear();
    document.getElementById('current-year').textContent = year;
-   
+   document.getElementsByClassName('.tg-link').href = "../index.html"
  })();

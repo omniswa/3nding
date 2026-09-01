@@ -4,12 +4,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3NDING — Books Archive</title>
+  
+  <!-- Primary SEO -->
+  <title>3NDING — Free Online Book Archive | Read Stories & Novels</title>
+  <meta name="description" content="Browse and read a growing archive of free books online — novels, letters, field notes and more. Search by title or author, save favorites, and start reading instantly.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://3nding.top">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="3NDING">
+  <meta property="og:title" content="3NDING — Free Online Book Archive">
+  <meta property="og:description" content="Explore a growing library of stories and dive into your next great read. Search, favorite, and read books online for free.">
+  <meta property="og:url" content="https://3nding.top">
+  <meta property="og:image" content="https://3nding.top/images/og-cover.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="3NDING — Free Online Book Archive">
+  <meta name="twitter:description" content="Explore a growing library of stories and dive into your next great read.">
+  <meta name="twitter:image" content="https://3nding.top/images/og-cover.jpg">
+  
+  <meta name="theme-color" content="#171b21">
+  
   <link rel="stylesheet" href="styles/index.css">
   <link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/worksans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/spacemono.woff2" as="font" type="font/woff2" crossorigin>
   
+  <!-- Structured data: identifies this page as a collection of books -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": "3NDING Books Archive",
+      "description": "A growing archive of free books to read online — novels, letters, field notes and more.",
+      "url": "https://3nding.top",
+      "isPartOf": {
+        "@type": "WebSite",
+        "name": "3NDING",
+        "url": "https://3nding.top"
+      }
+    }
+  </script>
 </head>
 
 <body>
@@ -68,6 +108,12 @@
     <span aria-hidden="true">·</span> <a href="pages/terms.html" class="footer-link">terms</a>
     <span aria-hidden="true">·</span> <a href="pages/privacy.html" class="footer-link">privacy</a>
   </footer>
+  
+  <noscript>
+    <p style="max-width:600px;margin:2rem auto;padding:0 1.25rem;font-family:sans-serif;color:#ece4d1;">
+      This archive's catalog loads with JavaScript enabled. Please enable JavaScript to browse and search the books.
+    </p>
+  </noscript>
   
   <script src="scripts/index.js" defer></script>
   

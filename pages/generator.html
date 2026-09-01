@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../styles/blog.css">
   
   <!-- Marked.js CDN for Markdown Parsing -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="../scripts/marked.js" defer></script>
   
   <style>
     .site-header {
@@ -91,7 +91,7 @@
     pre.code-preview {
       background: var(--ink);
       color: var(--white);
-      padding: 1.25rem;
+      padding: 1.5rem;
       border-radius: 10px;
       overflow-x: auto;
       font-size: 0.85rem;
@@ -104,7 +104,7 @@
       position: absolute;
       top: 0.6rem;
       right: 0.6rem;
-      padding: 0.35rem 0.75rem;
+      padding: 0.4rem 0.8rem;
       font-size: 0.75rem;
       background: rgba(255, 253, 248, 0.15);
       border: 1px solid rgba(255, 253, 248, 0.25);
@@ -374,7 +374,7 @@ Your text goes here.
           <div class="telegram-cta__body">
             <h3>Get new posts on Telegram</h3>
             <p>Join the channel for early access to new guides and quick updates.</p>
-            <a class="btn" href="https://t.me/[your-channel]" target="_blank" rel="noopener">Join the channel</a>
+            <a class="btn tg-link" href="#" target="_blank" rel="noopener">Join the channel</a>
           </div>
         </div>
         
