@@ -375,7 +375,7 @@
     
     .btn {
       flex: 1;
-      padding: 12px 16px;
+      padding: 10px 14px;
       font-size: 0.95rem;
       font-weight: 600;
       font-family: 'Work Sans';
@@ -508,6 +508,12 @@
     
     .modal-overlay.active .action-sheet {
       transform: translateY(0);
+    }
+    
+    .actions{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
     
     .sheet-handle {
@@ -682,22 +688,24 @@
   <div class="modal-overlay" id="actionSheetModal">
     <div class="action-sheet">
       <div class="sheet-handle"></div>
-      <button class="sheet-btn" id="sheetPinBtn">
-        <span class="sheet-icon" data-icon="pin"></span>
-        <span class="sheet-label">Pin to Top</span>
-      </button>
-      <button class="sheet-btn" id="sheetRenameBtn">
-        <span class="sheet-icon" data-icon="pencil"></span>
-        <span class="sheet-label">Rename</span>
-      </button>
-      <button class="sheet-btn" id="sheetExportBtn">
-        <span class="sheet-icon" data-icon="download"></span>
-        <span class="sheet-label">Export File</span>
-      </button>
-      <button class="sheet-btn danger" id="sheetDeleteBtn">
-        <span class="sheet-icon" data-icon="trash-2"></span>
-        <span class="sheet-label">Delete</span>
-      </button>
+      <div class="actions">
+        <button class="sheet-btn" id="sheetPinBtn">
+          <span class="sheet-icon" data-icon="pin"></span>
+          <span class="sheet-label">Pin</span>
+        </button>
+        <button class="sheet-btn" id="sheetRenameBtn">
+          <span class="sheet-icon" data-icon="pencil"></span>
+          <span class="sheet-label">Rename</span>
+        </button>
+        <button class="sheet-btn" id="sheetExportBtn">
+          <span class="sheet-icon" data-icon="download"></span>
+          <span class="sheet-label">Export</span>
+        </button>
+        <button class="sheet-btn danger" id="sheetDeleteBtn">
+          <span class="sheet-icon" data-icon="trash-2"></span>
+          <span class="sheet-label">Delete</span>
+        </button>
+      </div>
     </div>
   </div>
   
@@ -1202,7 +1210,7 @@
     
     function openActionSheet(item) {
       state.activeItemForSheet = item;
-      sheetPinBtn.querySelector('.sheet-label').textContent = item.pinned ? 'Unpin from Top' : 'Pin to Top';
+      sheetPinBtn.querySelector('.sheet-label').textContent = item.pinned ? 'Unpin' : 'Pin';
       actionSheetModal.classList.add('active');
     }
     
