@@ -92,11 +92,11 @@
     pre.code-preview {
       background: var(--ink);
       color: var(--white);
-      padding: 1.5rem;
+      padding: 2rem 2rem 1.65rem;
       border-radius: 10px;
       overflow-x: auto;
       font-size: 0.85rem;
-      line-height: 1.5;
+      line-height: 1.8;
       margin: 0;
       font-family: monospace;
     }
@@ -240,7 +240,7 @@ Your text goes here.
         jsonOutput.textContent = JSON.stringify(jsonObject, null, 2);
       }
       
-      // Markdown Post-Processing: Table wrapping & Data-labels + External link detection
+      // Markdown Post-Processing: Table wrapping, Data-labels, Link detection, & List classes
       function processMarkdownHtml(rawHtml) {
         const temp = document.createElement('div');
         temp.innerHTML = rawHtml;
@@ -278,6 +278,15 @@ Your text goes here.
           wrapper.className = 'table-wrap';
           table.parentNode.insertBefore(wrapper, table);
           wrapper.appendChild(table);
+        });
+        
+        // 3. Lists: Add styled-list to <ul> and step-list to <ol>
+        temp.querySelectorAll('ul').forEach(ul => {
+          ul.classList.add('styled-list');
+        });
+        
+        temp.querySelectorAll('ol').forEach(ol => {
+          ol.classList.add('step-list');
         });
         
         return temp.innerHTML;
@@ -352,7 +361,7 @@ Your text goes here.
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="#top">3NDING</a>
-      <button class="btn" type="button" data-open-modal>Read Book</button>
+      <button class="btn read-book" type="button" data-open-modal>Read Book</button>
     </div>
   </header>
   
@@ -372,6 +381,7 @@ Your text goes here.
         
         ${parsedBody}
         
+        <hr>
         <div class="telegram-cta">
           <div class="telegram-cta__body">
             <h3>Get new posts on Telegram</h3>

@@ -510,6 +510,11 @@ footer {
 }
 
 @media (min-width: 640px) {
+  article p,
+  article li {
+    text-align: justify;
+  }
+  
   .toc-backdrop {
     align-items: center;
     padding: 1.5rem;
@@ -558,7 +563,7 @@ footer {
   padding: 0;
 }
 
-.toc-list li + li {
+.toc-list li+li {
   border-top: 1px solid var(--line);
 }
 
