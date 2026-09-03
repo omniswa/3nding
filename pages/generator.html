@@ -218,7 +218,8 @@ Your text goes here.
           .toString()
           .toLowerCase()
           .trim()
-          .replace(/[\s\W-]+/g, '-')
+          .replace(/['’]/g, '') // 1. Remove single quotes / apostrophes
+          .replace(/[\s\W-]+/g, '-') // 2. Replace remaining symbols & spaces with hyphens
           .replace(/^-+|-+$/g, '') || 'post';
       }
       
