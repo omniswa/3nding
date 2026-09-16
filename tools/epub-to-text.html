@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0C0E">
+  <meta name="description" content="Spine splits any EPUB into clean, chapter-by-chapter plain text files — entirely in your browser. No upload, no sign-up.">
+  <title>Spine — EPUB to TXT chapter splitter</title>
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="%23ECEDE8" stroke-width="1.8"/><path d="M8.7 3v18" stroke="%23CDF463" stroke-width="2"/><path d="M12.6 8.3h4.6M12.6 12h4.6" stroke="%23A6ABAF" stroke-width="1.8" stroke-linecap="round"/></svg>'>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+  <style>
+    /* ---------- tokens ---------- */
+    :root {
+      --bg: #0B0C0E;
+      --bg-2: #0F1114;
+      --surface: #15181C;
+      --surface-2: #1C2025;
+      --line: rgba(255, 255, 255, .07);
+      --line-2: rgba(255, 255, 255, .13);
+      --ink: #ECEDE8;
+      --ink-2: #A6ABAF;
+      --ink-3: #62676D;
+      --accent: #CDF463;
+      --accent-dim: rgba(205, 244, 99, .12);
+      --accent-ink: #171B06;
+      --danger: #FF6E5E;
+      --font-ui: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    }
+    
+    /* ---------- base ---------- */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+    
+    [hidden] {
+      display: none !important
+    }
+    
+    /* ← add this line */
+    html {
+      color-scheme: dark
+    }
+    
+    html {
+      color-scheme: dark
+    }
+    
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      font-size: 16px;
+      line-height: 1.5;
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    body::before {
+      /* faint top light for depth */
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: radial-gradient(900px 420px at 50% -140px, rgba(255, 255, 255, .045), transparent 70%);
+    }
+    
+    body.locked {
+      overflow: hidden
+    }
+    
+    button {
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: 0
+    }
+    
+    img {
+      display: block
+    }
+    
+    ::selection {
+      background: var(--accent);
+      color: var(--accent-ink)
+    }
+    
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px
+    }
+    
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 20px 48px
+    }
+    
+    /* ---------- header ---------- */
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: calc(env(safe-area-inset-top) + 18px) 0 4px
+    }
+    
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+    
+    .logo {
+      width: 26px;
+      height: 26px
+    }
+    
+    .lg-frame {
+      stroke: var(--ink);
+      stroke-width: 1.7
+    }
+    
+    .lg-spine {
+      stroke: var(--accent);
+      stroke-width: 2;
+      stroke-linecap: round
+    }
+    
+    .lg-line {
+      stroke: var(--ink-3);
+      stroke-width: 1.7;
+      stroke-linecap: round
+    }
+    
+    .wordmark {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 560;
+      font-size: 1.22rem;
+      letter-spacing: .01em
+    }
+    
+    .trust {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font: 500 10.5px/1 var(--font-mono);
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 11px;
+    }
+    
+    .trust svg {
+      width: 12px;
+      height: 12px;
+      color: var(--accent)
+    }
+    
+    /* ---------- hero ---------- */
+    .hero {
+      padding: 32px 0 0
+    }
+    
+    .eyebrow {
+      font: 500 10.5px/1 var(--font-mono);
+      letter-spacing: .16em;
+      color: var(--accent)
+    }
+    
+    h1 {
+      margin-top: 15px;
+      font-family: var(--font-display);
+      font-weight: 520;
+      font-size: clamp(2rem, 6vw + .9rem, 2.9rem);
+      line-height: 1.12;
+      letter-spacing: -.015em;
+      text-wrap: balance;
+    }
+    
+    h1 em {
+      font-style: italic;
+      font-weight: 560;
+      color: var(--accent)
+    }
+    
+    .sub {
+      margin-top: 15px;
+      max-width: 46ch;
+      color: var(--ink-2);
+      font-size: 15px;
+      line-height: 1.65;
+      text-wrap: pretty
+    }
+    
+    /* ---------- dropzone ---------- */
+    #dropzone {
+      margin-top: 26px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 34px 22px 30px;
+      border-radius: 22px;
+      cursor: pointer;
+      user-select: none;
+      background: var(--bg-2);
+      border: 1.5px dashed var(--line-2);
+      transition: border-color .25s, background .25s, transform .15s;
+    }
+    
+    #dropzone:hover {
+      border-color: rgba(255, 255, 255, .24)
+    }
+    
+    #dropzone:active {
+      transform: scale(.985)
+    }
+    
+    #dropzone.dragging {
+      border-color: var(--accent);
+      background: var(--accent-dim)
+    }
+    
+    .dz-art {
+      width: 172px;
+      margin-bottom: 16px;
+      overflow: visible
+    }
+    
+    .dz-frame {
+      stroke: var(--line-2);
+      stroke-width: 2;
+      fill: none;
+      transition: stroke .25s
+    }
+    
+    .dz-spine {
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-linecap: round
+    }
+    
+    .dz-line {
+      stroke: var(--ink-3);
+      stroke-width: 7;
+      stroke-linecap: round;
+      transition: stroke .25s, transform .35s cubic-bezier(.2, .7, .2, 1)
+    }
+    
+    #dropzone:hover .l1,
+    #dropzone.dragging .l1 {
+      transform: translateX(4px)
+    }
+    
+    #dropzone:hover .l2,
+    #dropzone.dragging .l2 {
+      transform: translateX(7px);
+      transition-delay: .04s
+    }
+    
+    #dropzone:hover .l3,
+    #dropzone.dragging .l3 {
+      transform: translateX(4px);
+      transition-delay: .08s
+    }
+    
+    #dropzone.dragging .dz-line,
+    #dropzone.dragging .dz-frame {
+      stroke: var(--accent)
+    }
+    
+    #dropzone.busy .dz-line {
+      animation: blink 1.1s ease-in-out infinite
+    }
+    
+    #dropzone.busy .l2 {
+      animation-delay: .18s
+    }
+    
+    #dropzone.busy .l3 {
+      animation-delay: .36s
+    }
+    
+    @keyframes blink {
+      
+      0%,
+      100% {
+        opacity: 1
+      }
+      
+      50% {
+        opacity: .25
+      }
+    }
+    
+    .dz-idle strong {
+      display: block;
+      font-size: 16.5px;
+      font-weight: 600
+    }
+    
+    .dz-idle span {
+      display: block;
+      margin-top: 7px;
+      font: 400 12px/1 var(--font-mono);
+      color: var(--ink-3);
+      letter-spacing: .04em
+    }
+    
+    .dz-busy {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 11px
+    }
+    
+    .dz-busy .spin {
+      width: 26px;
+      height: 26px;
+      color: var(--accent)
+    }
+    
+    #parse-status {
+      font-size: 14px;
+      font-weight: 500
+    }
+    
+    #parse-file {
+      max-width: 100%;
+      font: 400 11.5px/1.4 var(--font-mono);
+      color: var(--ink-3);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: pre-wrap;
+    }
+    
+    .spin {
+      animation: spin .8s linear infinite
+    }
+    
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+    
+    /* ---------- steps / privacy / footer ---------- */
+    .steps-label {
+      margin-top: 34px;
+      font: 500 10px/1 var(--font-mono);
+      letter-spacing: .18em;
+      color: var(--ink-3)
+    }
+    
+    .steps {
+      list-style: none;
+      margin-top: 6px
+    }
+    
+    .steps li {
+      display: flex;
+      gap: 14px;
+      padding: 13px 2px;
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink-2)
+    }
+    
+    .steps li:last-child {
+      border-bottom: 1px solid var(--line)
+    }
+    
+    .steps .n {
+      font: 500 10.5px/1.9 var(--font-mono);
+      letter-spacing: .06em;
+      color: var(--accent)
+    }
+    
+    .privacy {
+      margin-top: 22px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 12.5px;
+      color: var(--ink-3)
+    }
+    
+    .privacy svg {
+      width: 14px;
+      height: 14px;
+      flex: none;
+      color: var(--accent);
+      opacity: .75
+    }
+    
+    .colophon {
+      margin-top: 46px;
+      text-align: center;
+      font: 400 10px/1.8 var(--font-mono);
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--ink-3)
+    }
+    
+    /* ---------- screens ---------- */
+    .screen {
+      display: none
+    }
+    
+    .screen.active {
+      display: block;
+      animation: screen-in .45s cubic-bezier(.2, .7, .2, 1) both
+    }
+    
+    @keyframes screen-in {
+      from {
+        opacity: 0;
+        transform: translateY(14px)
+      }
+      
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
+    
+    #screen-result {
+      padding-bottom: calc(env(safe-area-inset-bottom) + 40px)
+    }
+    
+    /* ---------- result ---------- */
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line-2);
+      border-radius: 999px;
+      padding: 9px 15px;
+      font: 500 13px var(--font-ui);
+      color: var(--ink);
+      transition: background .2s, transform .12s, border-color .2s, color .2s;
+    }
+    
+    .btn-ghost svg {
+      width: 15px;
+      height: 15px
+    }
+    
+    .btn-ghost:hover {
+      background: var(--surface)
+    }
+    
+    .btn-ghost:active {
+      transform: scale(.97)
+    }
+    
+    .btn-ghost.accent {
+      border-color: rgba(205, 244, 99, .35);
+      color: var(--accent)
+    }
+    
+    .res-top {
+      padding: 20px 0 4px
+    }
+    
+    .book {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      padding: 20px 0 24px
+    }
+    
+    .cover {
+      flex: none;
+      width: 84px;
+      aspect-ratio: 2/3;
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 14px 30px -14px rgba(0, 0, 0, .65);
+    }
+    
+    @media(min-width:720px) {
+      .cover {
+        width: 96px
+      }
+    }
+    
+    .cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover
+    }
+    
+    .cover svg {
+      width: 34px;
+      height: 34px;
+      color: var(--ink-3)
+    }
+    
+    .book-meta {
+      min-width: 0
+    }
+    
+    .book-meta .label {
+      font: 500 10px/1 var(--font-mono);
+      letter-spacing: .18em;
+      color: var(--accent)
+    }
+    
+    #book-title {
+      margin: 8px 0 4px;
+      font-family: var(--font-display);
+      font-weight: 520;
+      font-size: 1.55rem;
+      line-height: 1.22;
+      letter-spacing: -.01em;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    #book-author {
+      font-size: 13.5px;
+      color: var(--ink-2)
+    }
+    
+    #book-stats {
+      margin-top: 11px;
+      font: 400 11px/1.6 var(--font-mono);
+      letter-spacing: .02em;
+      color: var(--ink-3)
+    }
+    
+    .opt {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 15px 2px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      font-size: 13.5px;
+      color: var(--ink-2);
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .opt input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none
+    }
+    
+    .switch {
+      flex: none;
+      position: relative;
+      width: 46px;
+      height: 27px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-2);
+      transition: background .2s, border-color .2s;
+    }
+    
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 2.5px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: var(--ink-3);
+      transition: transform .22s cubic-bezier(.2, .7, .2, 1), background .2s;
+    }
+    
+    .opt input:checked~.switch {
+      background: var(--accent);
+      border-color: var(--accent)
+    }
+    
+    .opt input:checked~.switch::after {
+      transform: translateX(19px);
+      background: var(--accent-ink)
+    }
+    
+    .opt input:focus-visible~.switch {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px
+    }
+    
+    .list-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 26px 2px 10px;
+      font: 500 10.5px var(--font-mono);
+      letter-spacing: .18em;
+      color: var(--ink-3);
+    }
+    
+    #ch-count {
+      color: var(--accent)
+    }
+    
+    #ch-list {
+      list-style: none
+    }
+    
+    .ch-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-align: left;
+      padding: 13px 4px;
+      border-top: 1px solid var(--line);
+      animation: row-in .5s cubic-bezier(.2, .7, .2, 1) both;
+      transition: background .15s;
+    }
+    
+    @keyframes row-in {
+      from {
+        opacity: 0;
+        transform: translateY(8px)
+      }
+      
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
+    
+    @media(hover:hover) {
+      .ch-row:hover {
+        background: rgba(255, 255, 255, .025)
+      }
+    }
+    
+    .ch-num {
+      flex: none;
+      width: 24px;
+      font: 500 11px/1 var(--font-mono);
+      color: var(--accent);
+      opacity: .8
+    }
+    
+    .ch-title {
+      flex: 1;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .ch-words {
+      flex: none;
+      min-width: 36px;
+      text-align: right;
+      font: 400 11.5px/1 var(--font-mono);
+      color: var(--ink-3)
+    }
+    
+    .ch-chev {
+      flex: none;
+      width: 15px;
+      height: 15px;
+      color: var(--ink-3)
+    }
+    
+    /* ---------- download bar ---------- */
+    #dl-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 20px calc(env(safe-area-inset-bottom) + 12px);
+      background: rgba(11, 12, 14, .78);
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+      border-top: 1px solid var(--line);
+    }
+    
+    @media(max-width:719px) {
+      #dl-bar {
+        animation: bar-in .5s .12s cubic-bezier(.2, .7, .2, 1) both
+      }
+    }
+    
+    @keyframes bar-in {
+      from {
+        transform: translateY(100%)
+      }
+      
+      to {
+        transform: none
+      }
+    }
+    
+    @media(min-width:720px) {
+      #dl-bar {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: 640px;
+        bottom: 20px;
+        border: 1px solid var(--line-2);
+        border-radius: 16px;
+        padding: 12px 12px 12px 20px;
+        box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .65);
+      }
+    }
+    
+    .dl-info strong {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 600
+    }
+    
+    .dl-info span {
+      display: block;
+      margin-top: 3px;
+      font: 400 11px/1 var(--font-mono);
+      color: var(--ink-3)
+    }
+    
+    .btn-primary {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-radius: 999px;
+      padding: 13px 20px;
+      font: 600 14px var(--font-ui);
+      transition: transform .12s, filter .2s, opacity .2s;
+    }
+    
+    .btn-primary svg {
+      width: 17px;
+      height: 17px
+    }
+    
+    .btn-primary:hover {
+      filter: brightness(1.06)
+    }
+    
+    .btn-primary:active {
+      transform: scale(.96)
+    }
+    
+    .btn-primary:disabled {
+      opacity: .7;
+      cursor: default
+    }
+    
+    /* ---------- bottom sheet ---------- */
+    #sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(5, 6, 7, .6);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+      opacity: 0;
+      transition: opacity .28s;
+    }
+    
+    #sheet-backdrop.show {
+      opacity: 1
+    }
+    
+    #sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 70;
+      margin: 0 auto;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      max-height: 82dvh;
+      background: var(--surface);
+      border: 1px solid var(--line-2);
+      border-bottom: 0;
+      border-radius: 24px 24px 0 0;
+      box-shadow: 0 -20px 60px -20px rgba(0, 0, 0, .6);
+      transform: translateY(104%);
+      transition: transform .34s cubic-bezier(.2, .75, .2, 1);
+    }
+    
+    #sheet.show {
+      transform: translateY(0)
+    }
+    
+    #sheet.dragging {
+      transition: none
+    }
+    
+    #sheet-head {
+      padding: 10px 20px 13px;
+      border-bottom: 1px solid var(--line);
+      touch-action: none;
+      cursor: grab;
+      user-select: none
+    }
+    
+    .grab {
+      width: 40px;
+      height: 4px;
+      border-radius: 99px;
+      background: var(--line-2);
+      margin: 2px auto 13px
+    }
+    
+    .sheet-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px
+    }
+    
+    #sheet-title {
+      font-family: var(--font-display);
+      font-weight: 520;
+      font-size: 1.25rem;
+      line-height: 1.25
+    }
+    
+    #sheet-meta {
+      margin-top: 6px;
+      font: 400 11px/1.5 var(--font-mono);
+      color: var(--ink-3)
+    }
+    
+    .icon-btn {
+      flex: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid var(--line-2);
+      background: var(--surface-2);
+      color: var(--ink-2);
+      display: grid;
+      place-items: center;
+      transition: color .2s, transform .12s;
+    }
+    
+    .icon-btn svg {
+      width: 15px;
+      height: 15px
+    }
+    
+    .icon-btn:active {
+      transform: scale(.92)
+    }
+    
+    #sheet-body {
+      flex: 1;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 18px 20px 8px
+    }
+    
+    #sheet-hint {
+      margin-bottom: 12px;
+      font: 500 10px/1 var(--font-mono);
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      opacity: .85
+    }
+    
+    #sheet-text {
+      font-family: var(--font-display);
+      font-size: 15.5px;
+      line-height: 1.78;
+      color: #D7D8D2;
+      white-space: pre-wrap;
+      user-select: text
+    }
+    
+    .sheet-actions {
+      display: flex;
+      gap: 10px;
+      padding: 14px 20px calc(env(safe-area-inset-bottom) + 14px);
+      border-top: 1px solid var(--line)
+    }
+    
+    .sheet-actions .btn-ghost {
+      flex: 1;
+      justify-content: center
+    }
+    
+    /* ---------- toasts ---------- */
+    #toasts {
+      position: fixed;
+      top: calc(env(safe-area-inset-top) + 14px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: min(92vw, 420px);
+      pointer-events: none;
+    }
+    
+    .toast {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      background: var(--surface-2);
+      border: 1px solid var(--line-2);
+      border-radius: 14px;
+      padding: 11px 14px;
+      font-size: 13px;
+      box-shadow: 0 14px 40px -12px rgba(0, 0, 0, .55);
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity .25s, transform .25s;
+    }
+    
+    .toast.in {
+      opacity: 1;
+      transform: none
+    }
+    
+    .toast svg {
+      flex: none;
+      width: 17px;
+      height: 17px
+    }
+    
+    .toast.ok svg {
+      color: var(--accent)
+    }
+    
+    .toast.alert svg {
+      color: var(--danger)
+    }
+    
+    @media (prefers-reduced-motion:reduce) {
+      
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important
+      }
+    }
+  </style>
+</head>
+
+<body>
+  
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect class="lg-frame" x="3.2" y="3.2" width="17.6" height="17.6" rx="5" />
+          <path class="lg-spine" d="M8.7 3.2v17.6" />
+          <path class="lg-line" d="M12.6 8.3h4.6M12.6 12h4.6M12.6 15.7h2.8" />
+        </svg>
+        <span class="wordmark">spine</span>
+      </div>
+      <span class="trust">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5" />
+          <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+        </svg>
+        on-device
+      </span>
+    </header>
+    
+    <main>
+      <!-- ============ SCREEN: DROP ============ -->
+      <section id="screen-drop" class="screen active">
+        <div class="hero">
+          <p class="eyebrow">EPUB &rarr; TXT &middot; CHAPTER SPLITTER</p>
+          <h1>Break any book into <em>chapters</em> of plain text.</h1>
+          <p class="sub">A quiet little tool that reads an EPUB's table of contents, splits it into clean chapter-by-chapter text files, and hands you one tidy .zip. No upload, no account, no waiting.</p>
+        </div>
+        
+        <div id="dropzone" role="button" tabindex="0" aria-label="Choose an EPUB file">
+          <svg class="dz-art" viewBox="0 0 176 132" fill="none" aria-hidden="true">
+            <rect class="dz-frame" x="26" y="6" width="124" height="120" rx="18" />
+            <path class="dz-spine" d="M52 6v120" />
+            <path class="dz-line l1" d="M74 42h48" />
+            <path class="dz-line l2" d="M74 66h48" />
+            <path class="dz-line l3" d="M74 90h30" />
+          </svg>
+          <div class="dz-idle" id="dz-idle">
+            <strong>Drop your EPUB here</strong>
+            <span>or tap to browse &middot; .epub</span>
+          </div>
+          <div class="dz-busy" id="dz-busy" hidden>
+            <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+              <path d="M12 3a9 9 0 1 0 9 9" />
+            </svg>
+            <span id="parse-status">Opening archive&hellip;</span>
+            <span id="parse-file"></span>
+          </div>
+        </div>
+        
+        <p class="steps-label">HOW IT WORKS</p>
+        <ol class="steps">
+          <li><span class="n">01</span><span>Drop an EPUB &mdash; the file stays on your device and is never uploaded anywhere.</span></li>
+          <li><span class="n">02</span><span>Spine reads the book's own table of contents and detects every chapter, in reading order.</span></li>
+          <li><span class="n">03</span><span>Preview any chapter, then download all of them as one clean .zip of .txt files.</span></li>
+        </ol>
+        
+        <p class="privacy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5" />
+            <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+          </svg>
+          Files are processed locally in your browser and never leave your device.
+        </p>
+        
+        <p class="colophon">spine &middot; local-first &middot; no sign-up</p>
+      </section>
+      
+      <!-- ============ SCREEN: RESULT ============ -->
+      <section id="screen-result" class="screen">
+        <div class="res-top">
+          <button id="btn-new" class="btn-ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M12 5.5v13M5.5 12h13" />
+            </svg>
+            New file
+          </button>
+        </div>
+        
+        <div class="book">
+          <div class="cover">
+            <img id="cover-img" alt="Book cover" hidden>
+            <svg id="cover-ph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H19v20H7.5A2.5 2.5 0 0 1 5 19.5v-15Z" />
+              <path d="M5 19.5A2.5 2.5 0 0 1 7.5 17H19" />
+            </svg>
+          </div>
+          <div class="book-meta">
+            <p class="label">BOOK</p>
+            <h2 id="book-title" dir="auto"></h2>
+            <p id="book-author"></p>
+            <p id="book-stats"></p>
+          </div>
+        </div>
+        
+        <label class="opt">
+          <span>Also include the full book as a single .txt</span>
+          <input type="checkbox" id="opt-full">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+        
+        <div class="list-head"><span>CHAPTERS</span><span id="ch-count"></span></div>
+        <ol id="ch-list"></ol>
+      </section>
+    </main>
+  </div>
+  
+  <!-- ============ DOWNLOAD BAR ============ -->
+  <div id="dl-bar" hidden>
+    <div class="dl-info">
+      <strong id="dl-files"></strong>
+      <span id="dl-size"></span>
+    </div>
+    <button id="btn-zip" class="btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" />
+      </svg>
+      <span>Download .zip</span>
+    </button>
+  </div>
+  
+  <!-- ============ CHAPTER PREVIEW SHEET ============ -->
+  <div id="sheet-backdrop" hidden></div>
+  <section id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+    <div id="sheet-head">
+      <div class="grab" aria-hidden="true"></div>
+      <div class="sheet-title-row">
+        <div>
+          <h3 id="sheet-title" dir="auto"></h3>
+          <p id="sheet-meta"></p>
+        </div>
+        <button id="sheet-close" class="icon-btn" aria-label="Close preview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div id="sheet-body">
+      <p id="sheet-hint"></p>
+      <p id="sheet-text" dir="auto"></p>
+    </div>
+    <div class="sheet-actions">
+      <button id="btn-copy" class="btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="11" height="11" rx="2" />
+          <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+        </svg>
+        Copy text
+      </button>
+      <button id="btn-dl-one" class="btn-ghost accent">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" />
+        </svg>
+        Save .txt
+      </button>
+    </div>
+  </section>
+  
+  <div id="toasts" aria-live="polite"></div>
+  <input type="file" id="file-input" accept=".epub,application/epub+zip" hidden>
+  <noscript>
+    <p style="padding:2rem;text-align:center">Spine needs JavaScript — all conversion happens locally in your browser.</p>
+  </noscript>
+  
+  <script>
+    (() => {
+      'use strict';
+      
+      /* ================= helpers ================= */
+      const $ = (s, r = document) => r.querySelector(s);
+      const tick = (ms = 0) => new Promise(r => setTimeout(r, ms));
+      const nextFrame = () => new Promise(r => requestAnimationFrame(r));
+      const encoder = new TextEncoder();
+      const fmtInt = new Intl.NumberFormat();
+      const fmtCompact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+      const words = t => (t.match(/\S+/g) || []).length;
+      const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } [c]));
+      const sanitize = s => (s || '').replace(/[\\/:*?"<>|\x00-\x1F]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '').slice(0, 90) || 'untitled';
+      
+      function fmtBytes(n) {
+        if (n < 1024) return n + ' B';
+        const u = ['KB', 'MB', 'GB'];
+        let i = -1;
+        do {
+          n /= 1024;
+          i++;
+        } while (n >= 1024 && i < 2);
+        return (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + ' ' + u[i];
+      }
+      
+      /* ================= dom refs ================= */
+      const dropzone = $('#dropzone'),
+        fileInput = $('#file-input');
+      const dzIdle = $('#dz-idle'),
+        dzBusy = $('#dz-busy'),
+        parseStatus = $('#parse-status'),
+        parseFile = $('#parse-file');
+      const bookTitle = $('#book-title'),
+        bookAuthor = $('#book-author'),
+        bookStats = $('#book-stats');
+      const coverImg = $('#cover-img'),
+        coverPh = $('#cover-ph');
+      const chList = $('#ch-list'),
+        chCount = $('#ch-count'),
+        optFull = $('#opt-full');
+      const dlBar = $('#dl-bar'),
+        dlFiles = $('#dl-files'),
+        dlSize = $('#dl-size'),
+        btnZip = $('#btn-zip');
+      const sheet = $('#sheet'),
+        sheetBackdrop = $('#sheet-backdrop'),
+        sheetHead = $('#sheet-head');
+      const sheetTitle = $('#sheet-title'),
+        sheetMeta = $('#sheet-meta'),
+        sheetText = $('#sheet-text'),
+        sheetHint = $('#sheet-hint');
+      const btnCloseSheet = $('#sheet-close'),
+        btnCopy = $('#btn-copy'),
+        btnDlOne = $('#btn-dl-one');
+      const toasts = $('#toasts');
+      
+      const state = { busy: false, packing: false, book: null, fullText: '', fullBytes: 0, coverURL: null, current: -1, lastFocus: null };
+      
+      /* ================= icons / svg strings ================= */
+      const I = {
+        check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+        alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2 3.3 19.4h17.4L12 4.2Z"/><path d="M12 10.2v3.6"/><path d="M12 16.9h.01"/></svg>',
+        spinner: '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg>',
+        download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>'
+      };
+      const CHEV = '<svg class="ch-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 5.5 6.5 6.5-6.5 6.5"/></svg>';
+      
+      /* ================= toasts ================= */
+      function toast(msg, type = 'ok') {
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = (type === 'alert' ? I.alert : I.check) + `<span>${escapeHtml(msg)}</span>`;
+        const dismiss = () => {
+          el.classList.remove('in');
+          setTimeout(() => el.remove(), 260);
+        };
+        el.addEventListener('click', dismiss);
+        toasts.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('in'));
+        setTimeout(dismiss, 3400);
+      }
+      
+      /* ================= screens ================= */
+      function showScreen(name) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
+        dlBar.hidden = name !== 'result';
+        window.scrollTo({ top: 0 });
+      }
+      
+      /* ================= file intake ================= */
+      dropzone.addEventListener('click', () => { if (!state.busy) fileInput.click(); });
+      dropzone.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!state.busy) fileInput.click(); }
+      });
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files[0];
+        fileInput.value = '';
+        if (f) handleFile(f);
+      });
+      
+      let dragDepth = 0;
+      dropzone.addEventListener('dragenter', e => {
+        e.preventDefault();
+        dragDepth++;
+        dropzone.classList.add('dragging');
+      });
+      dropzone.addEventListener('dragover', e => e.preventDefault());
+      dropzone.addEventListener('dragleave', () => {
+        if (--dragDepth <= 0) {
+          dragDepth = 0;
+          dropzone.classList.remove('dragging');
+        }
+      });
+      dropzone.addEventListener('drop', e => {
+        e.preventDefault();
+        dragDepth = 0;
+        dropzone.classList.remove('dragging');
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) handleFile(f);
+      });
+      window.addEventListener('dragover', e => e.preventDefault());
+      window.addEventListener('drop', e => e.preventDefault());
+      
+      async function handleFile(file) {
+        if (state.busy) return;
+        if (!/\.(epub|zip)$/i.test(file.name) && !/epub|zip/i.test(file.type)) {
+          toast('That doesn\u2019t look like an EPUB file.', 'alert');
+          return;
+        }
+        if (!window.fflate) {
+          toast('Couldn\u2019t load the zip engine \u2014 check your connection.', 'alert');
+          return;
+        }
+        state.busy = true;
+        dropzone.classList.add('busy');
+        dzIdle.hidden = true;
+        dzBusy.hidden = false;
+        parseFile.textContent = file.name;
+        try {
+          const bk = await parseEpub(file);
+          state.book = bk;
+          document.title = `${bk.title} \u2014 Spine`;
+          renderResult(bk, file);
+          showScreen('result');
+        } catch (err) {
+          console.error(err);
+          toast(err.message || 'Couldn\u2019t read this EPUB.', 'alert');
+        } finally {
+          state.busy = false;
+          dropzone.classList.remove('busy');
+          dzIdle.hidden = false;
+          dzBusy.hidden = true;
+        }
+      }
+      
+      /* staged status with a small minimum dwell so the sequence reads clearly */
+      async function stage(label, fn, min = 160) {
+        parseStatus.innerHTML = label;
+        const t0 = performance.now();
+        const out = await fn();
+        const left = min - (performance.now() - t0);
+        if (left > 0) await tick(left);
+        return out;
+      }
+      
+      /* ================= EPUB parsing ================= */
+      function resolvePath(base, href) {
+        let p = (href || '').split('#')[0];
+        try { p = decodeURIComponent(p); } catch {}
+        if (!p || p.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(p)) return p.replace(/^\/+/, '');
+        const out = [];
+        for (const seg of (base + p).split('/')) {
+          if (!seg || seg === '.') continue;
+          if (seg === '..') out.pop();
+          else out.push(seg);
+        }
+        return out.join('/');
+      }
+      
+      function parseNav(html) {
+        if (!html) return null;
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        let nav = [...doc.querySelectorAll('nav')].find(n =>
+          (n.getAttribute('epub:type') || '').split(/\s+/).includes('toc'));
+        if (!nav) nav = doc.querySelector('nav');
+        if (!nav) return null;
+        const out = [];
+        for (const a of nav.querySelectorAll('a[href]')) {
+          const href = a.getAttribute('href') || '';
+          const label = (a.textContent || '').replace(/\s+/g, ' ').trim();
+          if (label && href && !/^[a-z]+:\/\//i.test(href)) out.push({ label, href });
+        }
+        return out.length ? out : null;
+      }
+      
+      function parseNcx(xml) {
+        if (!xml) return null;
+        let doc;
+        try {
+          doc = new DOMParser().parseFromString(xml, 'application/xml');
+          if (doc.getElementsByTagName('parsererror').length) throw 0;
+        } catch { doc = new DOMParser().parseFromString(xml, 'text/html'); }
+        const out = [];
+        for (const np of doc.getElementsByTagName('navPoint')) { // document order = reading order
+          const label = (np.getElementsByTagName('text')[0] || {}).textContent;
+          const src = (np.getElementsByTagName('content')[0] || {}).getAttribute && np.getElementsByTagName('content')[0].getAttribute('src');
+          if (label && src) out.push({ label: label.replace(/\s+/g, ' ').trim(), href: src });
+        }
+        return out.length ? out : null;
+      }
+      
+      async function parseEpub(file) {
+        let entries;
+        await stage('Opening archive\u2026', async () => {
+          const buf = new Uint8Array(await file.arrayBuffer());
+          try { entries = fflate.unzipSync(buf); }
+          catch { throw new Error('Couldn\u2019t open this file \u2014 the EPUB archive seems damaged.'); }
+        }, 220);
+        
+        const lowerMap = new Map(Object.keys(entries).map(k => [k.toLowerCase(), entries[k]]));
+        const entryAt = p => entries[p] || lowerMap.get((p || '').toLowerCase());
+        const textAt = p => { const e = entryAt(p); return e ? new TextDecoder('utf-8').decode(e) : null; };
+        
+        /* container.xml -> package (.opf) */
+        let opfPath = null;
+        await stage('Reading package\u2026', () => {
+          const c = textAt('META-INF/container.xml');
+          if (c) {
+            const doc = new DOMParser().parseFromString(c, 'application/xml');
+            const roots = [...doc.getElementsByTagName('rootfile')];
+            const pick = roots.find(r => /\.opf$/i.test(r.getAttribute('full-path') || '')) || roots[0];
+            opfPath = pick && pick.getAttribute('full-path');
+          }
+          if (!opfPath) opfPath = Object.keys(entries).find(k => /\.opf$/i.test(k)) || null;
+          if (!opfPath || !entryAt(opfPath)) throw new Error('This archive doesn\u2019t contain an EPUB package (.opf).');
+        }, 200);
+        
+        const opfDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+        const opfDoc = new DOMParser().parseFromString(textAt(opfPath), 'application/xml');
+        if (opfDoc.getElementsByTagName('parsererror').length) throw new Error('The EPUB package file is malformed.');
+        const byLocal = (root, name) => [...root.getElementsByTagName('*')].filter(el => el.localName === name);
+        
+        /* manifest */
+        const items = new Map();
+        for (const item of byLocal(opfDoc, 'item')) {
+          const id = item.getAttribute('id'),
+            href = item.getAttribute('href');
+          if (!id || !href) continue;
+          items.set(id, {
+            path: resolvePath(opfDir, href),
+            mediaType: item.getAttribute('media-type') || '',
+            props: (item.getAttribute('properties') || '').split(/\s+/).filter(Boolean)
+          });
+        }
+        
+        /* metadata: title, author, cover */
+        let title = '',
+          author = '',
+          coverPath = null;
+        const md = byLocal(opfDoc, 'metadata')[0];
+        if (md)
+          for (const el of md.getElementsByTagName('*')) {
+            const n = el.localName;
+            if (n === 'title' && !title) title = el.textContent.trim();
+            else if (n === 'creator' && !author) author = el.textContent.trim();
+            else if (n === 'meta' && el.getAttribute('name') === 'cover') {
+              const it = items.get(el.getAttribute('content'));
+              if (it && it.mediaType.startsWith('image/')) coverPath = it.path;
+            }
+          }
+        for (const it of items.values()) {
+          if (it.props.includes('cover-image') && it.mediaType.startsWith('image/')) { coverPath = it.path; break; }
+        }
+        
+        /* spine (reading order) */
+        const spineEl = byLocal(opfDoc, 'spine')[0];
+        if (!spineEl) throw new Error('No reading order (spine) found in this EPUB.');
+        const spinePaths = [];
+        for (const ref of byLocal(spineEl, 'itemref')) {
+          const it = items.get(ref.getAttribute('idref'));
+          if (it && /xhtml|html/i.test(it.mediaType) && entryAt(it.path)) spinePaths.push(it.path);
+        }
+        if (!spinePaths.length) throw new Error('No readable HTML content in this EPUB.');
+        
+        /* table of contents: EPUB 3 nav, then EPUB 2 NCX */
+        const toc = await stage('Detecting chapters\u2026', () => {
+          const navItem = [...items.values()].find(it => it.props.includes('nav'));
+          if (navItem) { const t = parseNav(textAt(navItem.path)); if (t) return t; }
+          const ncxItem = [...items.values()].find(it => it.mediaType === 'application/x-dtbncx+xml') ||
+            items.get(spineEl.getAttribute('toc') || '');
+          if (ncxItem) { const t = parseNcx(textAt(ncxItem.path)); if (t) return t; }
+          return null;
+        }, 240);
+        
+        const chapters = await stage('Extracting text\u2026', () => buildChapters(spinePaths, toc, opfDir, entryAt), 200);
+        if (!chapters.length) throw new Error('Couldn\u2019t find any chapters in this book.');
+        
+        if (!title) title = file.name.replace(/\.epub$/i, '').replace(/[_-]+/g, ' ').trim() || 'Untitled book';
+        
+        let coverURL = null;
+        if (coverPath) {
+          const e = entryAt(coverPath);
+          if (e) {
+            const it = [...items.values()].find(i => i.path === coverPath);
+            coverURL = URL.createObjectURL(new Blob([e], { type: (it && it.mediaType) || 'image/jpeg' }));
+          }
+        }
+        return { title, author, coverURL, chapters, tocUsed: !!toc };
+      }
+      
+      /* ================= HTML -> text ================= */
+      const BLOCK = new Set(['P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'ASIDE', 'NAV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'TABLE', 'TR', 'BLOCKQUOTE', 'PRE', 'FIGURE', 'FIGCAPTION', 'DL', 'DD', 'DT', 'FIELDSET', 'ADDRESS']);
+      const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'IFRAME', 'LINK', 'META', 'TITLE', 'HEAD']);
+      const cssEsc = s => (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&');
+      
+      function cleanDoc(doc) {
+        doc.querySelectorAll('script,style,noscript,template,svg,iframe,link,meta').forEach(el => el.remove());
+      }
+      
+      /* walks the DOM, emits plain text; records byte offsets where chapter anchors begin */
+      function extract(doc, markEls) {
+        const body = doc.body || doc.documentElement;
+        cleanDoc(doc);
+        let out = '';
+        const bounds = [];
+        const idx = markEls ? new Map() : null;
+        if (idx) markEls.forEach((el, i) => { if (el && !idx.has(el)) idx.set(el, i); });
+        (function walk(node) {
+          for (const ch of node.childNodes) {
+            if (ch.nodeType === 3) { out += ch.nodeValue.replace(/\s+/g, ' '); continue; }
+            if (ch.nodeType !== 1) continue;
+            const tag = ch.tagName;
+            if (SKIP.has(tag)) continue;
+            if (idx && idx.has(ch)) bounds.push({ i: idx.get(ch), at: out.length });
+            if (tag === 'BR') { out += '\n'; continue; }
+            if (tag === 'HR') { out += '\n\n* * *\n\n'; continue; }
+            if (tag === 'PRE') { out += '\n\n' + ch.textContent.replace(/\s+$/, '') + '\n\n'; continue; }
+            const block = BLOCK.has(tag);
+            if (block) out += '\n\n';
+            walk(ch);
+            if (block) out += '\n\n';
+          }
+        })(body);
+        return { out, bounds };
+      }
+      
+      const tidy = t => t.replace(/[ \t\r\f]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      
+      function firstHeading(doc) {
+        const h = doc.querySelector('h1,h2,h3,h4,h5,h6');
+        return h ? h.textContent.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+      }
+      
+      function findAnchor(doc, id) {
+        try { const el = doc.getElementById(id); if (el) return el; } catch {}
+        try { return doc.querySelector(`[id="${cssEsc(id)}"],[name="${cssEsc(id)}"]`); } catch {}
+        return null;
+      }
+      
+      /* Chapter detection strategy:
+         - with a TOC: map each entry to (spine document, anchor). Documents with several
+           TOC anchors are split at those anchor elements; documents without an entry are
+           merged into the previous chapter when they're tiny (copyright pages etc.).
+         - without a TOC: each spine document becomes a chapter, titled by its first heading. */
+      function buildChapters(spinePaths, toc, opfDir, entryAt) {
+        const parser = new DOMParser();
+        const idxOf = new Map(),
+          lowOf = new Map();
+        spinePaths.forEach((p, i) => {
+          idxOf.set(p, i);
+          lowOf.set(p.toLowerCase(), i);
+        });
+        
+        const marksByDoc = new Map();
+        if (toc) {
+          let last = -1;
+          for (const e of toc) {
+            let href = e.href,
+              frag = null;
+            const h = href.indexOf('#');
+            if (h >= 0) {
+              frag = href.slice(h + 1) || null;
+              href = href.slice(0, h);
+            }
+            let idx = -1;
+            if (href) {
+              const p = resolvePath(opfDir, href);
+              idx = idxOf.has(p) ? idxOf.get(p) : (lowOf.has(p.toLowerCase()) ? lowOf.get(p.toLowerCase()) : -1);
+            } else idx = last; // fragment-only href refers to the previous entry's document
+            if (idx < 0) continue;
+            last = idx;
+            if (!marksByDoc.has(idx)) marksByDoc.set(idx, []);
+            marksByDoc.get(idx).push({ label: e.label, anchor: frag });
+          }
+        }
+        
+        const loadDoc = p => {
+          const raw = entryAt(p);
+          if (!raw) return null;
+          return parser.parseFromString(new TextDecoder('utf-8').decode(raw), 'text/html');
+        };
+        
+        const chapters = [];
+        const pushChapter = (t, text) => {
+          text = tidy(text);
+          if (!text) return;
+          chapters.push({ title: (t || '').replace(/\s+/g, ' ').trim() || 'Untitled', text });
+        };
+        
+        const hasToc = marksByDoc.size > 0;
+        for (let i = 0; i < spinePaths.length; i++) {
+          const doc = loadDoc(spinePaths[i]);
+          if (!doc) continue;
+          const marks = marksByDoc.get(i);
+          
+          if (hasToc && !marks) {
+            const { out } = extract(doc, null);
+            if (chapters.length && words(out) < 60) { // tiny unlisted doc: fold into previous chapter
+              chapters[chapters.length - 1].text = tidy(chapters[chapters.length - 1].text + '\n\n' + out);
+            } else pushChapter(firstHeading(doc), out);
+            continue;
+          }
+          
+          if (marks) {
+            const anchorEls = marks.map(m => m.anchor ? findAnchor(doc, m.anchor) : null);
+            const { out, bounds } = extract(doc, anchorEls);
+            if (!bounds.length) { pushChapter(marks[0].label, out); continue; }
+            bounds.sort((a, b) => a.at - b.at);
+            const prefix = tidy(out.slice(0, bounds[0].at));
+            bounds.forEach((b, k) => {
+              const end = k + 1 < bounds.length ? bounds[k + 1].at : out.length;
+              let seg = tidy(out.slice(b.at, end));
+              if (k === 0 && prefix && words(prefix) >= 2) seg = tidy(prefix + '\n\n' + seg);
+              pushChapter(marks[b.i] && marks[b.i].label, seg);
+            });
+            continue;
+          }
+          
+          pushChapter(firstHeading(doc) || `Part ${i + 1}`, extract(doc, null).out);
+        }
+        return chapters;
+      }
+      
+      /* ================= rendering ================= */
+      function buildFullText(bk) {
+        const head = [bk.title, bk.author ? 'by ' + bk.author : ''].filter(Boolean).join('\n');
+        const body = bk.chapters.map((c, i) =>
+          `${String(i + 1).padStart(2, '0')}  ${c.title}\n\n${c.text}`
+        ).join('\n\n\n' + '\u2500'.repeat(30) + '\n\n\n');
+        return head + '\n\n' + '\u2500'.repeat(30) + '\n\n' + body + '\n';
+      }
+      
+      function renderResult(bk, file) {
+        if (state.coverURL) {
+          URL.revokeObjectURL(state.coverURL);
+          state.coverURL = null;
+        }
+        if (bk.coverURL) {
+          state.coverURL = bk.coverURL;
+          coverImg.src = bk.coverURL;
+          coverImg.hidden = false;
+          coverPh.hidden = true;
+        } else {
+          coverImg.hidden = true;
+          coverImg.removeAttribute('src');
+          coverPh.hidden = false;
+        }
+        coverImg.onerror = () => {
+          coverImg.hidden = true;
+          coverPh.hidden = false;
+        };
+        
+        bookTitle.textContent = bk.title;
+        bookAuthor.textContent = bk.author || 'Unknown author';
+        const totalWords = bk.chapters.reduce((s, c) => s + words(c.text), 0);
+        bookStats.textContent = `${bk.chapters.length} chapters \u00B7 ${fmtInt.format(totalWords)} words \u00B7 ${fmtBytes(file.size)} epub`;
+        
+        bk.chapters.forEach(c => { c.bytes = 3 + encoder.encode(c.text).length; }); // + UTF-8 BOM
+        state.fullText = buildFullText(bk);
+        state.fullBytes = 3 + encoder.encode(state.fullText).length;
+        
+        chList.textContent = '';
+        const frag = document.createDocumentFragment();
+        bk.chapters.forEach((c, i) => {
+          const li = document.createElement('li');
+          li.innerHTML =
+            `<button class="ch-row" style="animation-delay:${Math.min(i * 28, 560)}ms">` +
+            `<span class="ch-num">${String(i + 1).padStart(2, '0')}</span>` +
+            `<span class="ch-title" dir="auto">${escapeHtml(c.title)}</span>` +
+            `<span class="ch-words">${fmtCompact.format(words(c.text))}</span>` +
+            CHEV +
+            `</button>`;
+          const btn = li.firstElementChild;
+          btn.addEventListener('click', () => openSheet(i, btn));
+          frag.appendChild(li);
+        });
+        chList.appendChild(frag);
+        chCount.textContent = bk.chapters.length;
+        
+        optFull.checked = false;
+        updateSummary();
+      }
+      
+      function updateSummary() {
+        const bk = state.book;
+        if (!bk) return;
+        const n = bk.chapters.length + (optFull.checked ? 1 : 0);
+        let bytes = bk.chapters.reduce((s, c) => s + c.bytes, 0);
+        if (optFull.checked) bytes += state.fullBytes;
+        dlFiles.textContent = `${n} .txt file${n === 1 ? '' : 's'}`;
+        dlSize.textContent = `\u2248 ${fmtBytes(bytes)} of text`;
+      }
+      optFull.addEventListener('change', updateSummary);
+      
+      /* ================= zip download ================= */
+      function setBtn(text, icon) {
+        btnZip.innerHTML = (I[icon || 'download']) + `<span>${text}</span>`;
+      }
+      
+      btnZip.addEventListener('click', async () => {
+        const bk = state.book;
+        if (!bk || state.packing) return;
+        state.packing = true;
+        btnZip.disabled = true;
+        setBtn('Packing\u2026', 'spinner');
+        await nextFrame();
+        await tick(30);
+        try {
+          const files = {};
+          const used = new Set();
+          const width = Math.max(2, String(bk.chapters.length).length);
+          const nameFor = (n, t) => {
+            const base = `${String(n).padStart(width, '0')} - ${sanitize(t)}.txt`;
+            let k = 2,
+              name = base;
+            while (used.has(name.toLowerCase())) name = base.replace(/\.txt$/, ` (${k++}).txt`);
+            used.add(name.toLowerCase());
+            return name;
+          };
+          bk.chapters.forEach((c, i) => { files[nameFor(i + 1, c.title)] = encoder.encode('\uFEFF' + c.text); });
+          if (optFull.checked) {
+            files[`${'0'.padStart(width, '0')} - ${sanitize(bk.title)} (full book).txt`] = encoder.encode('\uFEFF' + state.fullText);
+          }
+          const zipped = fflate.zipSync(files, { level: 6 });
+          const url = URL.createObjectURL(new Blob([zipped], { type: 'application/zip' }));
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${sanitize(bk.title)} - chapters.zip`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          setBtn('Saved', 'check');
+          toast(`Saved ${bk.chapters.length} chapters to a .zip`);
+        } catch (err) {
+          console.error(err);
+          toast('Packing failed \u2014 please try again.', 'alert');
+        } finally {
+          state.packing = false;
+          btnZip.disabled = false;
+          setTimeout(() => setBtn('Download .zip', 'download'), 1600);
+        }
+      });
+      
+      /* ================= chapter preview sheet ================= */
+      let sheetHideTimer = null;
+      
+      function openSheet(i, trigger) {
+        const c = state.book.chapters[i];
+        if (!c) return;
+        state.current = i;
+        state.lastFocus = trigger;
+        sheetTitle.textContent = c.title;
+        sheetMeta.textContent = `Chapter ${i + 1} of ${state.book.chapters.length} \u00B7 ${fmtInt.format(words(c.text))} words`;
+        const LIMIT = 1600;
+        let t = c.text;
+        if (t.length > LIMIT) t = t.slice(0, LIMIT).replace(/\s+\S*$/, '') + ' \u2026';
+        sheetText.textContent = t;
+        const pw = words(t);
+        sheetHint.textContent = pw < words(c.text) ?
+          `Preview \u00B7 first ${fmtInt.format(pw)} of ${fmtInt.format(words(c.text))} words` :
+          'Full chapter';
+        sheet.style.transform = '';
+        sheetBackdrop.hidden = false;
+        sheet.hidden = false;
+        requestAnimationFrame(() => {
+          sheetBackdrop.classList.add('show');
+          sheet.classList.add('show');
+        });
+        document.body.classList.add('locked');
+        btnCloseSheet.focus();
+      }
+      
+      function closeSheet() {
+        sheet.classList.remove('show');
+        sheetBackdrop.classList.remove('show');
+        sheet.style.transform = '';
+        document.body.classList.remove('locked');
+        clearTimeout(sheetHideTimer);
+        sheetHideTimer = setTimeout(() => {
+          sheet.hidden = true;
+          sheetBackdrop.hidden = true;
+        }, 300);
+        if (state.lastFocus) {
+          state.lastFocus.focus();
+          state.lastFocus = null;
+        }
+      }
+      
+      btnCloseSheet.addEventListener('click', closeSheet);
+      sheetBackdrop.addEventListener('click', closeSheet);
+      window.addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) closeSheet(); });
+      
+      /* drag-down-to-dismiss on the sheet header */
+      let dragY = null;
+      sheetHead.addEventListener('pointerdown', e => {
+        if (e.target.closest('button')) return;
+        dragY = e.clientY;
+        sheet.classList.add('dragging');
+        try { sheetHead.setPointerCapture(e.pointerId); } catch {}
+      });
+      sheetHead.addEventListener('pointermove', e => {
+        if (dragY == null) return;
+        sheet.style.transform = `translateY(${Math.max(0, e.clientY - dragY)}px)`;
+      });
+      const endDrag = e => {
+        if (dragY == null) return;
+        const dy = Math.max(0, e.clientY - dragY);
+        dragY = null;
+        sheet.classList.remove('dragging');
+        sheet.style.transform = '';
+        if (dy > 96) closeSheet();
+      };
+      sheetHead.addEventListener('pointerup', endDrag);
+      sheetHead.addEventListener('pointercancel', endDrag);
+      
+      /* copy / single-chapter download */
+      btnCopy.addEventListener('click', async () => {
+        const c = state.book && state.book.chapters[state.current];
+        if (!c) return;
+        try {
+          await navigator.clipboard.writeText(c.text);
+          toast('Chapter text copied');
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = c.text;
+          ta.style.cssText = 'position:fixed;opacity:0';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand('copy');
+            toast('Chapter text copied');
+          }
+          catch { toast('Copy isn\u2019t available here.', 'alert'); }
+          ta.remove();
+        }
+      });
+      
+      btnDlOne.addEventListener('click', () => {
+        const i = state.current;
+        const c = state.book && state.book.chapters[i];
+        if (!c) return;
+        const width = Math.max(2, String(state.book.chapters.length).length);
+        const url = URL.createObjectURL(new Blob(['\uFEFF' + c.text], { type: 'text/plain;charset=utf-8' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${String(i + 1).padStart(width, '0')} - ${sanitize(c.title)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        toast('Chapter saved as .txt');
+      });
+      
+      /* ================= start over ================= */
+      $('#btn-new').addEventListener('click', () => {
+        if (state.coverURL) {
+          URL.revokeObjectURL(state.coverURL);
+          state.coverURL = null;
+        }
+        state.book = null;
+        state.fullText = '';
+        document.title = 'Spine \u2014 EPUB to TXT chapter splitter';
+        showScreen('drop');
+      });
+      
+    })();
+  </script>
+</body>
+
+</html>
