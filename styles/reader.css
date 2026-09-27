@@ -514,9 +514,13 @@ body.theme-dark {
 }
 
 /* ---- Cloud sync ---- */
+.sync-row {
+  margin-top: 1.3rem;
+}
+
 .sync-status {
   font-family: "Space Mono", monospace;
   font-size: 0.72rem;
   color: var(--text-muted);
-  margin: 0 0 0.55rem;
+  margin: 0.55rem 0 0.55rem;
 }

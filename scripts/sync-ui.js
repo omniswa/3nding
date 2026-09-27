@@ -16,7 +16,7 @@
       signinBtn.hidden = true;
       signoutBtn.hidden = false;
     } else {
-      statusText.textContent = "Off — reading stays on this device only.";
+      statusText.textContent = "Off — reading stays on this device.";
       signinBtn.hidden = false;
       signoutBtn.hidden = true;
     }
