@@ -1,14 +1,18 @@
 /**
- * Authentication + account-linked sync.
+ * Authentication + MANUAL account sync.
  *
- * data-auth="required"  -> page is gated. Signed-out visitors are sent to
- *                          the login page; signed-in readers get their
- *                          favorites / progress / settings synced.
- * data-auth="guest"     -> login / signup pages. No syncing, no redirect
- *                          (the page script decides where to go next).
+ * Everything is saved to localStorage as before. Nothing is sent to
+ * Firestore until the reader presses the Sync button (#syncBtn).
+ * One click = 1 read + at most 1 write (0 writes if nothing differs).
  *
- * Local data in localStorage remains what the page renders; Firestore
- * ("users/<uid>") is kept in step with it in both directions.
+ * Limits: SYNC_COOLDOWN_MS between syncs and SYNC_MAX_PER_DAY per day
+ * (client-side, per browser). Enforce the cooldown for real with the
+ * Firestore rule described in the setup notes, since client checks can
+ * be bypassed.
+ *
+ * data-auth="required" -> gated page (index, reader). Shows sync UI.
+ * data-auth="guest"    -> login / signup. No sync.
+ * data-auth="setup"    -> username page.
  */
 (function () {
   "use strict";
@@ -35,11 +39,13 @@
   const UNAME_MAX = 14;
   const SETUP = ROOT.href + "pages/username.html";
 
-  let sdkPromise = null;
-  let auth = null;
-  let db = null;
-  let unsubscribe = null;
-  let pushTimer = null;
+  // ---- manual sync limits ----
+  const SYNC_COOLDOWN_MS = 10 * 60 * 1000; // min gap between syncs
+  const SYNC_MAX_PER_DAY = 10; // per browser, per calendar day
+  const SYNCLOG_KEY = "3nding:sync-log";
+  const UNSYNCED_KEY = "3nding:unsynced";
+  let syncing = false;
+  let syncTicker = null;
   let applyingRemote = false;
   let signingOut = false;
   let firstEvent = true;
@@ -63,7 +69,7 @@
         ),
       Promise.resolve(),
     ).catch((err) => {
-      sdkPromise = null; // allow a retry
+      sdkPromise = null;
       throw err;
     });
     return sdkPromise;
@@ -110,7 +116,7 @@
     location.replace(u.href);
   }
 
-  // The username lives on users/<uid>; cache it so pages don't re-read it.
+  // The username lives on users/<uid>; cached so pages don't re-read it.
   async function usernameFor(user) {
     try {
       const c = JSON.parse(localStorage.getItem(UNAME_KEY) || "null");
@@ -137,22 +143,16 @@
       if (MODE === "required") {
         claimLocal(user.uid);
         const name = await usernameFor(user);
-        if (!name) return redirectToSetup(); // every account needs a username
+        if (!name) return redirectToSetup();
         renderAccount(user, name);
         reveal();
-        try {
-          await initialSync(user.uid);
-          subscribeRemote(user.uid);
-        } catch (err) {
-          console.warn("Sync: initial sync failed:", err);
-        }
+        bindSyncUI();
       } else if (MODE === "setup") {
         if (await usernameFor(user)) return location.replace(nextUrl());
         renderAccount(user, "");
         reveal();
       }
     } else {
-      stopRemote();
       if (MODE !== "guest" && !signingOut) redirectToLogin(MODE === "required");
     }
     if (firstEvent) {
@@ -232,8 +232,7 @@
     doomed.forEach((k) => localStorage.removeItem(k));
   }
 
-  // If a different reader signs in on this browser, don't let the
-  // previous reader's data bleed into their account.
+  // A different reader signing in on this browser must not inherit data.
   function claimLocal(uid) {
     const prev = localStorage.getItem(UID_KEY);
     if (prev && prev !== uid) clearLocal();
@@ -273,7 +272,24 @@
     return merged;
   }
 
+  // Key-order-independent equality, so we only write when data truly differs.
+  function stable(v) {
+    if (v === undefined) return "null";
+    if (v === null || typeof v !== "object") return JSON.stringify(v);
+    if (Array.isArray(v)) return "[" + v.map(stable).join(",") + "]";
+    return (
+      "{" +
+      Object.keys(v)
+        .sort()
+        .map((k) => JSON.stringify(k) + ":" + stable(v[k]))
+        .join(",") +
+      "}"
+    );
+  }
+  const same = (a, b) => stable(a) === stable(b);
+
   const docRef = (uid) => db.collection("users").doc(uid);
+  const safeId = (id) => id && id.indexOf(".") === -1;
 
   function reconcile(remote) {
     const local = readLocal();
@@ -302,95 +318,216 @@
     };
   }
 
-  async function initialSync(uid) {
-    const ref = docRef(uid);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      const local = readLocal();
-      const meta = readMeta();
-      await ref.set(
-        {
-          favorites: local.favorites,
-          favoritesUpdatedAt: meta.favoritesUpdatedAt || Date.now(),
-          settings: local.settings,
-          settingsUpdatedAt: meta.settingsUpdatedAt || Date.now(),
-          progress: local.progress,
-        },
-        { merge: true },
-      );
-      return;
-    }
-    await ref.set(reconcile(snap.data() || {}), { merge: true });
+  // ---------- manual sync ----------
+  function today() {
+    return new Date().toDateString();
   }
 
-  function subscribeRemote(uid) {
-    stopRemote();
-    unsubscribe = docRef(uid).onSnapshot(
-      (snap) => {
-        if (snap.exists) reconcile(snap.data() || {});
-      },
-      (err) => console.warn("Sync: live updates stopped:", err),
-    );
-  }
-
-  function stopRemote() {
-    if (unsubscribe) {
-      unsubscribe();
-      unsubscribe = null;
-    }
-  }
-
-  // ---------- push local changes ----------
-  function schedulePush() {
-    if (!auth || !auth.currentUser) return;
-    clearTimeout(pushTimer);
-    pushTimer = setTimeout(pushNow, 800);
-  }
-
-  async function pushNow() {
-    if (!auth || !auth.currentUser) return;
-    const local = readLocal();
-    const meta = readMeta();
+  function readLog() {
     try {
-      await docRef(auth.currentUser.uid).set(
-        {
-          favorites: local.favorites,
-          favoritesUpdatedAt: meta.favoritesUpdatedAt || Date.now(),
-          settings: local.settings,
-          settingsUpdatedAt: meta.settingsUpdatedAt || Date.now(),
-          progress: local.progress,
-        },
-        { merge: true },
-      );
-    } catch (err) {
-      console.warn("Sync: push failed:", err);
+      const l = JSON.parse(localStorage.getItem(SYNCLOG_KEY) || "{}");
+      return l.day === today()
+        ? { day: l.day, count: l.count || 0, last: l.last || 0 }
+        : { day: today(), count: 0, last: l.last || 0 };
+    } catch {
+      return { day: today(), count: 0, last: 0 };
     }
   }
 
-  if (MODE === "required") {
-    const bump = (key) => () => {
-      if (applyingRemote) return;
-      if (key) setMeta({ [key]: Date.now() });
-      schedulePush();
+  function syncStatus() {
+    const l = readLog();
+    const waitMs = Math.max(0, l.last + SYNC_COOLDOWN_MS - Date.now());
+    const remainingToday = Math.max(0, SYNC_MAX_PER_DAY - l.count);
+    return {
+      last: l.last,
+      waitMs,
+      remainingToday,
+      canSync: waitMs === 0 && remainingToday > 0 && !syncing,
+      unsynced: localStorage.getItem(UNSYNCED_KEY) === "1",
     };
-    window.addEventListener(
-      "3nding:favorites-changed",
-      bump("favoritesUpdatedAt"),
-    );
-    window.addEventListener(
-      "3nding:settings-changed",
-      bump("settingsUpdatedAt"),
-    );
-    window.addEventListener("3nding:progress-changed", bump(null));
+  }
+
+  function markUnsynced() {
+    try {
+      localStorage.setItem(UNSYNCED_KEY, "1");
+    } catch {}
+    paintSyncUI();
+  }
+
+  async function syncNow() {
+    await api();
+    await ready;
+    const user = auth.currentUser;
+    if (!user) throw coded("sync/no-user", "Not signed in.");
+    if (syncing) throw coded("sync/busy", "A sync is already running.");
+    const st = syncStatus();
+    if (st.remainingToday === 0)
+      throw coded("sync/daily-limit", "Daily sync limit reached.");
+    if (st.waitMs > 0) throw coded("sync/cooldown", "Please wait a bit.");
+
+    syncing = true;
+    paintSyncUI();
+    try {
+      const ref = docRef(user.uid);
+      const snap = await ref.get(); // 1 read
+      const remote = snap.exists ? snap.data() || {} : {};
+      const stamp = firebase.firestore.FieldValue.serverTimestamp();
+
+      let wrote = false;
+      if (!snap.exists) {
+        const local = readLocal();
+        const meta = readMeta();
+        await ref.set(
+          {
+            favorites: local.favorites,
+            favoritesUpdatedAt: meta.favoritesUpdatedAt || Date.now(),
+            settings: local.settings,
+            settingsUpdatedAt: meta.settingsUpdatedAt || Date.now(),
+            progress: local.progress,
+            lastSyncAt: stamp,
+          },
+          { merge: true },
+        );
+        wrote = true;
+      } else {
+        const merged = reconcile(remote); // updates local + notifies pages
+        const patch = {};
+        if (!same(merged.favorites, remote.favorites)) {
+          patch.favorites = merged.favorites || {};
+          patch.favoritesUpdatedAt = merged.favoritesUpdatedAt || Date.now();
+        }
+        if (!same(merged.settings, remote.settings)) {
+          patch.settings = merged.settings;
+          patch.settingsUpdatedAt = merged.settingsUpdatedAt || Date.now();
+        }
+        Object.keys(merged.progress || {}).forEach((id) => {
+          if (
+            safeId(id) &&
+            !same(merged.progress[id], (remote.progress || {})[id])
+          )
+            patch["progress." + id] = merged.progress[id];
+        });
+        if (Object.keys(patch).length) {
+          patch.lastSyncAt = stamp;
+          await ref.update(patch); // 1 write
+          wrote = true;
+        }
+      }
+
+      const l = readLog();
+      localStorage.setItem(
+        SYNCLOG_KEY,
+        JSON.stringify({ day: l.day, count: l.count + 1, last: Date.now() }),
+      );
+      localStorage.removeItem(UNSYNCED_KEY);
+      return { wrote };
+    } finally {
+      syncing = false;
+      paintSyncUI();
+    }
+  }
+
+  // ---------- sync UI (optional elements, safe if missing) ----------
+  // Expects: <button id="syncBtn"> and <p id="syncStatus"> in the page.
+  function ago(ts) {
+    if (!ts) return "never";
+    const m = Math.round((Date.now() - ts) / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return m + " min ago";
+    const h = Math.round(m / 60);
+    return h < 24 ? h + " h ago" : Math.round(h / 24) + " d ago";
+  }
+
+  function paintSyncUI(message) {
+    const btn = document.getElementById("syncBtn");
+    const label = document.getElementById("syncStatus");
+    if (!btn && !label) return;
+    const st = syncStatus();
+    if (btn) {
+      btn.disabled = !st.canSync;
+      btn.textContent = syncing
+        ? "Syncing…"
+        : st.remainingToday === 0
+          ? "Daily limit reached"
+          : st.waitMs > 0
+            ? "Sync again in " + Math.ceil(st.waitMs / 60000) + " min"
+            : st.unsynced
+              ? "Sync now (changes pending)"
+              : "Sync now";
+    }
+    if (label) {
+      label.textContent =
+        (message ? message + " · " : "") +
+        "Last synced: " +
+        ago(st.last) +
+        " · " +
+        st.remainingToday +
+        " sync" +
+        (st.remainingToday === 1 ? "" : "s") +
+        " left today";
+    }
+    // Re-check every 30s only while a cooldown is counting down.
+    clearTimeout(syncTicker);
+    if (st.waitMs > 0) syncTicker = setTimeout(() => paintSyncUI(), 30000);
+  }
+
+  const SYNC_ERRORS = {
+    "sync/cooldown": "Please wait before syncing again.",
+    "sync/daily-limit": "Daily sync limit reached.",
+    "sync/busy": "Already syncing.",
+    "permission-denied": "Sync blocked (too soon or not allowed).",
+    unavailable: "Network problem. Try again.",
+  };
+
+  function bindSyncUI() {
+    const btn = document.getElementById("syncBtn");
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", async () => {
+        try {
+          const r = await syncNow();
+          paintSyncUI(r.wrote ? "Synced" : "Already up to date");
+        } catch (err) {
+          paintSyncUI(SYNC_ERRORS[err.code] || "Sync failed. Try again.");
+        }
+      });
+    }
+    paintSyncUI();
+  }
+
+  // Any local change just flags "unsynced". No network involved.
+  if (MODE === "required") {
+    const onFav = () => {
+      if (applyingRemote) return;
+      setMeta({ favoritesUpdatedAt: Date.now() });
+      markUnsynced();
+    };
+    const onSettings = () => {
+      if (applyingRemote) return;
+      setMeta({ settingsUpdatedAt: Date.now() });
+      markUnsynced();
+    };
+    const onProgress = () => {
+      if (applyingRemote) return;
+      markUnsynced();
+    };
+    window.addEventListener("3nding:favorites-changed", onFav);
+    window.addEventListener("3nding:settings-changed", onSettings);
+    window.addEventListener("3nding:progress-changed", onProgress);
   }
 
   // ---------- public API ----------
   async function signOut() {
     signingOut = true;
     try {
-      clearTimeout(pushTimer);
-      await pushNow(); // flush anything not yet uploaded
-      stopRemote();
+      // Local data is wiped on sign-out, so warn if it was never synced.
+      if (
+        syncStatus().unsynced &&
+        !confirm(
+          "You have changes that haven't been synced. Signing out will remove them from this device. Sign out anyway?",
+        )
+      )
+        throw coded("signout/cancelled", "Cancelled.");
       await auth.signOut();
       clearLocal(); // UID_KEY is kept on purpose; see claimLocal()
       location.replace(LOGIN);
@@ -472,8 +609,6 @@
     return name;
   }
 
-  // Account exists but the username couldn't be claimed (e.g. lost a race):
-  // send them to the setup page rather than leaving them without one.
   async function claimAfterSignup(user, username) {
     if (!username || (await usernameFor(user))) return;
     try {
@@ -496,6 +631,8 @@
     nextUrl,
     setupUrl,
     signOut,
+    syncNow,
+    syncStatus,
     USERNAME: { min: UNAME_MIN, max: UNAME_MAX },
     validateUsername,
     isUsernameAvailable,
