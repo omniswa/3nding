@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Auth gate: hide the page until sign-in state is known (see scripts/auth.js) -->
+    <script>
+      document.documentElement.classList.add("auth-pending");
+    </script>
+    <style>
+      html.auth-pending body {
+        visibility: hidden;
+      }
+    </style>
+
     <title>3NDING — Reader</title>
+    <meta name="robots" content="noindex, follow" />
     <script src="scripts/jszip.js" defer></script>
     <link rel="stylesheet" href="styles/reader.css" />
     <link
@@ -111,27 +123,16 @@
 
       <button class="reset-btn" id="resetBtn">Reset to defaults</button>
 
-      <div class="setting-group sync-row" id="syncRow" hidden>
-        <span class="setting-label">Cloud sync</span>
-        <p class="sync-status" id="syncStatusText">
-          Off — reading stays on this device.
-        </p>
+      <div class="setting-group sync-row" id="accountRow">
+        <span class="setting-label">Account</span>
+        <p class="sync-status" id="accountEmail">Signed in</p>
         <button
           type="button"
           class="opt-btn"
-          id="syncSigninBtn"
+          id="signOutBtn"
           style="width: 100%"
         >
-          Sign in with Google to sync
-        </button>
-        <button
-          type="button"
-          class="opt-btn"
-          id="syncSignoutBtn"
-          style="width: 100%"
-          hidden
-        >
-          Turn off sync
+          Sign out
         </button>
       </div>
 
@@ -147,8 +148,7 @@
     </div>
 
     <script src="scripts/firebase-config.js" defer></script>
-    <script src="scripts/cloud-sync.js" defer></script>
-    <script src="scripts/sync-ui.js" defer></script>
+    <script src="scripts/auth.js" data-auth="required" defer></script>
     <script src="scripts/reader.js" defer></script>
   </body>
 </html>
