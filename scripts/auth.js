@@ -1,14 +1,22 @@
 /**
- * Authentication + MANUAL account sync.
+ * Authentication + AUTOMATIC, cost-aware account sync.
  *
- * Everything is saved to localStorage as before. Nothing is sent to
- * Firestore until the reader presses the Sync button (#syncBtn).
- * One click = 1 read + at most 1 write (0 writes if nothing differs).
+ * Everything is still saved to localStorage first. Firestore is touched
+ * only in these cases:
  *
- * Limits: SYNC_COOLDOWN_MS between syncs and SYNC_MAX_PER_DAY per day
- * (client-side, per browser). Enforce the cooldown for real with the
- * Firestore rule described in the setup notes, since client checks can
- * be bypassed.
+ *   PULL (1 read)   once on sign-in, then at most every PULL_MIN_INTERVAL_MS
+ *                   (when the tab regains focus), or on "Sync now".
+ *   PUSH (1 write)  debounced: PUSH_IDLE_MS after the last change, but never
+ *                   later than PUSH_MAX_WAIT_MS after the first change; also
+ *                   when the tab is hidden / page closes. Only fields that
+ *                   differ from the last-known server copy are written, and
+ *                   nothing is written if nothing differs.
+ *
+ * No realtime listeners (onSnapshot bills a read per change).
+ * Per-browser daily caps: MAX_WRITES_PER_DAY / MAX_READS_PER_DAY.
+ *
+ * IMPORTANT: if your Firestore rules enforce a gap on lastSyncAt, lower it
+ * to ~15 seconds (this client never writes more often than that).
  *
  * data-auth="required" -> gated page (index, reader). Shows sync UI.
  * data-auth="guest"    -> login / signup. No sync.
@@ -35,20 +43,33 @@
   const SETTINGS_KEY = "3nding:settings";
   const PROGRESS_PREFIX = "3nding:progress:";
   const UNAME_KEY = "3nding:username";
+  const SHADOW_KEY = "3nding:sync-shadow"; // last-known server copy
+  const SYNCLOG_KEY = "3nding:sync-log";
+  const UNSYNCED_KEY = "3nding:unsynced";
   const UNAME_MIN = 6;
   const UNAME_MAX = 14;
   const SETUP = ROOT.href + "pages/username.html";
 
-  // ---- manual sync limits ----
-  const SYNC_COOLDOWN_MS = 10 * 60 * 1000; // min gap between syncs
-  const SYNC_MAX_PER_DAY = 10; // per browser, per calendar day
-  const SYNCLOG_KEY = "3nding:sync-log";
-  const UNSYNCED_KEY = "3nding:unsynced";
-  let sdkPromise = null; // <-- add
-  let auth = null; // <-- add
-  let db = null; // <-- add
-  let syncing = false;
+  // ---- auto-sync tuning (all cost knobs live here) ----
+  const PULL_MIN_INTERVAL_MS = 15 * 60 * 1000; // min gap between reads
+  const PUSH_IDLE_MS = 60 * 1000; // write after this much quiet
+  const PUSH_MAX_WAIT_MS = 5 * 60 * 1000; // ...but never wait longer than this
+  const PUSH_MIN_GAP_MS = 60 * 1000; // min gap between normal writes
+  const FLUSH_MIN_GAP_MS = 15 * 1000; // min gap when leaving the page
+  const MANUAL_COOLDOWN_MS = 30 * 1000; // "Sync now" button cooldown
+  const MAX_WRITES_PER_DAY = 100; // per browser
+  const MAX_READS_PER_DAY = 40; // per browser
+
+  let sdkPromise = null;
+  let auth = null;
+  let db = null;
+  let pulling = false;
+  let pushing = false;
   let syncTicker = null;
+  let pushTimer = null;
+  let firstDirtyAt = 0;
+  let failCount = 0;
+  let autoStarted = false;
   let applyingRemote = false;
   let signingOut = false;
   let firstEvent = true;
@@ -150,6 +171,7 @@
         renderAccount(user, name);
         reveal();
         bindSyncUI();
+        startAutoSync();
       } else if (MODE === "setup") {
         if (await usernameFor(user)) return location.replace(nextUrl());
         renderAccount(user, "");
@@ -227,7 +249,14 @@
   }
 
   function clearLocal() {
-    const doomed = [FAVORITES_KEY, SETTINGS_KEY, META_KEY, UNAME_KEY];
+    const doomed = [
+      FAVORITES_KEY,
+      SETTINGS_KEY,
+      META_KEY,
+      UNAME_KEY,
+      SHADOW_KEY,
+      UNSYNCED_KEY,
+    ];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && k.indexOf(PROGRESS_PREFIX) === 0) doomed.push(k);
@@ -250,10 +279,27 @@
     }
   }
   function setMeta(patch) {
-    localStorage.setItem(
-      META_KEY,
-      JSON.stringify(Object.assign(readMeta(), patch)),
-    );
+    try {
+      localStorage.setItem(
+        META_KEY,
+        JSON.stringify(Object.assign(readMeta(), patch)),
+      );
+    } catch {}
+  }
+
+  // "Shadow" = what we believe the server currently holds. Lets us write
+  // only what changed, and skip the write entirely when nothing did.
+  function readShadow() {
+    try {
+      return JSON.parse(localStorage.getItem(SHADOW_KEY) || "null");
+    } catch {
+      return null;
+    }
+  }
+  function writeShadow(s) {
+    try {
+      localStorage.setItem(SHADOW_KEY, JSON.stringify(s));
+    } catch {}
   }
 
   // ---------- merge rules ----------
@@ -312,126 +358,253 @@
     const progress = mergeProgress(local.progress, remote.progress);
     writeLocal({ favorites: fav.value, settings: sett.value, progress });
     setMeta({ favoritesUpdatedAt: fav.ts, settingsUpdatedAt: sett.ts });
-    return {
-      favorites: fav.value,
-      favoritesUpdatedAt: fav.ts,
-      settings: sett.value,
-      settingsUpdatedAt: sett.ts,
-      progress,
-    };
   }
 
-  // ---------- manual sync ----------
+  // ---------- usage log (per browser, per calendar day) ----------
   function today() {
     return new Date().toDateString();
   }
 
   function readLog() {
+    let l = {};
     try {
-      const l = JSON.parse(localStorage.getItem(SYNCLOG_KEY) || "{}");
-      return l.day === today()
-        ? { day: l.day, count: l.count || 0, last: l.last || 0 }
-        : { day: today(), count: 0, last: l.last || 0 };
-    } catch {
-      return { day: today(), count: 0, last: 0 };
-    }
-  }
-
-  function syncStatus() {
-    const l = readLog();
-    const waitMs = Math.max(0, l.last + SYNC_COOLDOWN_MS - Date.now());
-    const remainingToday = Math.max(0, SYNC_MAX_PER_DAY - l.count);
+      l = JSON.parse(localStorage.getItem(SYNCLOG_KEY) || "{}") || {};
+    } catch {}
+    const fresh = l.day === today();
     return {
-      last: l.last,
-      waitMs,
-      remainingToday,
-      canSync: waitMs === 0 && remainingToday > 0 && !syncing,
-      unsynced: localStorage.getItem(UNSYNCED_KEY) === "1",
+      day: today(),
+      reads: fresh ? l.reads || 0 : 0,
+      writes: fresh ? l.writes || 0 : 0,
+      lastPull: l.lastPull || 0,
+      lastPush: l.lastPush || 0,
+      lastManual: l.lastManual || 0,
     };
   }
 
-  function markUnsynced() {
+  function patchLog(p) {
     try {
-      localStorage.setItem(UNSYNCED_KEY, "1");
-    } catch {}
-    paintSyncUI();
-  }
-
-  async function syncNow() {
-    await api();
-    await ready;
-    const user = auth.currentUser;
-    if (!user) throw coded("sync/no-user", "Not signed in.");
-    if (syncing) throw coded("sync/busy", "A sync is already running.");
-    const st = syncStatus();
-    if (st.remainingToday === 0)
-      throw coded("sync/daily-limit", "Daily sync limit reached.");
-    if (st.waitMs > 0) throw coded("sync/cooldown", "Please wait a bit.");
-
-    syncing = true;
-    paintSyncUI();
-    try {
-      const ref = docRef(user.uid);
-      const snap = await ref.get(); // 1 read
-      const remote = snap.exists ? snap.data() || {} : {};
-      const stamp = firebase.firestore.FieldValue.serverTimestamp();
-
-      let wrote = false;
-      if (!snap.exists) {
-        const local = readLocal();
-        const meta = readMeta();
-        await ref.set(
-          {
-            favorites: local.favorites,
-            favoritesUpdatedAt: meta.favoritesUpdatedAt || Date.now(),
-            settings: local.settings,
-            settingsUpdatedAt: meta.settingsUpdatedAt || Date.now(),
-            progress: local.progress,
-            lastSyncAt: stamp,
-          },
-          { merge: true },
-        );
-        wrote = true;
-      } else {
-        const merged = reconcile(remote); // updates local + notifies pages
-        const patch = {};
-        if (!same(merged.favorites, remote.favorites)) {
-          patch.favorites = merged.favorites || {};
-          patch.favoritesUpdatedAt = merged.favoritesUpdatedAt || Date.now();
-        }
-        if (!same(merged.settings, remote.settings)) {
-          patch.settings = merged.settings;
-          patch.settingsUpdatedAt = merged.settingsUpdatedAt || Date.now();
-        }
-        Object.keys(merged.progress || {}).forEach((id) => {
-          if (
-            safeId(id) &&
-            !same(merged.progress[id], (remote.progress || {})[id])
-          )
-            patch["progress." + id] = merged.progress[id];
-        });
-        if (Object.keys(patch).length) {
-          patch.lastSyncAt = stamp;
-          await ref.update(patch); // 1 write
-          wrote = true;
-        }
-      }
-
-      const l = readLog();
       localStorage.setItem(
         SYNCLOG_KEY,
-        JSON.stringify({ day: l.day, count: l.count + 1, last: Date.now() }),
+        JSON.stringify(Object.assign(readLog(), p)),
       );
-      localStorage.removeItem(UNSYNCED_KEY);
-      return { wrote };
+    } catch {}
+  }
+
+  function coded(code, message) {
+    const e = new Error(message);
+    e.code = code;
+    return e;
+  }
+
+  // ---------- diff + write ----------
+  // Compare local data to the shadow and return only what must be written.
+  // Progress uses one dotted path per book so devices never clobber each
+  // other's entries for different books.
+  function buildPatch(local, base) {
+    const meta = readMeta();
+    const patch = {};
+    if (!same(local.favorites || {}, base.favorites || {})) {
+      patch.favorites = local.favorites || {};
+      patch.favoritesUpdatedAt = meta.favoritesUpdatedAt || Date.now();
+    }
+    if (local.settings && !same(local.settings, base.settings)) {
+      patch.settings = local.settings;
+      patch.settingsUpdatedAt = meta.settingsUpdatedAt || Date.now();
+    }
+    Object.keys(local.progress || {}).forEach((id) => {
+      if (safeId(id) && !same(local.progress[id], (base.progress || {})[id]))
+        patch["progress." + id] = local.progress[id];
+    });
+    return patch;
+  }
+
+  function applyPatchToShadow(patch) {
+    const sh = readShadow() || { progress: {} };
+    if ("favorites" in patch) {
+      sh.favorites = patch.favorites;
+      sh.favoritesUpdatedAt = patch.favoritesUpdatedAt;
+    }
+    if ("settings" in patch) {
+      sh.settings = patch.settings;
+      sh.settingsUpdatedAt = patch.settingsUpdatedAt;
+    }
+    sh.progress = sh.progress || {};
+    Object.keys(patch).forEach((k) => {
+      if (k.indexOf("progress.") === 0) sh.progress[k.slice(9)] = patch[k];
+    });
+    writeShadow(sh);
+  }
+
+  function toNested(patch) {
+    const out = {};
+    Object.keys(patch).forEach((k) => {
+      if (k.indexOf("progress.") === 0)
+        (out.progress = out.progress || {})[k.slice(9)] = patch[k];
+      else out[k] = patch[k];
+    });
+    return out;
+  }
+
+  async function writeRemote(uid, patch) {
+    const ref = docRef(uid);
+    const stamp = firebase.firestore.FieldValue.serverTimestamp();
+    try {
+      await ref.update(Object.assign({}, patch, { lastSyncAt: stamp })); // 1 write
+    } catch (err) {
+      if (err.code !== "not-found") throw err;
+      await ref.set(Object.assign(toNested(patch), { lastSyncAt: stamp }), {
+        merge: true,
+      });
+    }
+  }
+
+  // ---------- PULL: 1 read, throttled ----------
+  async function pull(force) {
+    if (!auth) await api();
+    await ready;
+    const user = auth.currentUser;
+    if (!user) return { skipped: true };
+    if (pulling) return { skipped: true };
+
+    const log = readLog();
+    if (!force) {
+      if (Date.now() - (readMeta().lastPullAt || 0) < PULL_MIN_INTERVAL_MS)
+        return { skipped: true };
+      if (log.reads >= MAX_READS_PER_DAY) return { skipped: true };
+    } else if (log.reads >= MAX_READS_PER_DAY) {
+      throw coded("sync/daily-limit", "Daily sync limit reached.");
+    }
+
+    pulling = true;
+    paintSyncUI();
+    try {
+      const snap = await docRef(user.uid).get(); // 1 read
+      patchLog({ reads: log.reads + 1, lastPull: Date.now() });
+      const remote = snap.exists ? snap.data() || {} : {};
+      reconcile(remote); // merges into local + notifies pages
+      writeShadow({
+        favorites: remote.favorites,
+        favoritesUpdatedAt: remote.favoritesUpdatedAt,
+        settings: remote.settings,
+        settingsUpdatedAt: remote.settingsUpdatedAt,
+        progress: remote.progress || {},
+      });
+      setMeta({ lastPullAt: Date.now() });
     } finally {
-      syncing = false;
+      pulling = false;
+      paintSyncUI();
+    }
+    // Anything local that's newer than the server goes up now (max 1 write).
+    const r = await pushDirty({ force: true });
+    return { wrote: !!(r && r.wrote) };
+  }
+
+  // ---------- PUSH: at most 1 write, only if something differs ----------
+  function schedulePush(delayOverride) {
+    if (MODE !== "required") return;
+    if (!firstDirtyAt) firstDirtyAt = Date.now();
+    clearTimeout(pushTimer);
+    const untilMax = Math.max(0, firstDirtyAt + PUSH_MAX_WAIT_MS - Date.now());
+    const wait =
+      typeof delayOverride === "number"
+        ? delayOverride
+        : Math.min(PUSH_IDLE_MS, untilMax);
+    pushTimer = setTimeout(async () => {
+      firstDirtyAt = 0;
+      try {
+        await pushDirty();
+        failCount = 0;
+      } catch (err) {
+        paintSyncUI(SYNC_ERRORS[err.code] || "Sync failed. Will retry.");
+        if (++failCount < 3) schedulePush(2 * 60 * 1000);
+      }
+    }, wait);
+  }
+
+  async function pushDirty(opts) {
+    opts = opts || {};
+    if (!auth) await api();
+    await ready;
+    const user = auth.currentUser;
+    if (!user || pushing) return { wrote: false };
+
+    const shadow = readShadow();
+    if (!shadow) {
+      // Never pulled on this browser: pull first so we don't overwrite
+      // newer server data. pull() will push afterwards.
+      return pull(true);
+    }
+
+    const log = readLog();
+    const minGap = opts.force ? 0 : opts.minGap || PUSH_MIN_GAP_MS;
+    const sinceLast = Date.now() - log.lastPush;
+    if (sinceLast < minGap) {
+      schedulePush(minGap - sinceLast + 500);
+      return { wrote: false, deferred: true };
+    }
+    if (log.writes >= MAX_WRITES_PER_DAY)
+      throw coded("sync/daily-limit", "Daily sync limit reached.");
+
+    const patch = buildPatch(readLocal(), shadow);
+    if (!Object.keys(patch).length) {
+      localStorage.removeItem(UNSYNCED_KEY);
+      paintSyncUI();
+      return { wrote: false };
+    }
+
+    pushing = true;
+    paintSyncUI();
+    try {
+      await writeRemote(user.uid, patch);
+      applyPatchToShadow(patch);
+      patchLog({ writes: log.writes + 1, lastPush: Date.now() });
+      // Changes made while the write was in flight get another round.
+      if (Object.keys(buildPatch(readLocal(), readShadow())).length)
+        schedulePush();
+      else localStorage.removeItem(UNSYNCED_KEY);
+      return { wrote: true };
+    } finally {
+      pushing = false;
       paintSyncUI();
     }
   }
 
-  // ---------- sync UI (optional elements, safe if missing) ----------
-  // Expects: <button id="syncBtn"> and <p id="syncStatus"> in the page.
+  function startAutoSync() {
+    if (autoStarted || MODE !== "required") return;
+    autoStarted = true;
+    pull(false)
+      .catch((err) => console.warn("Auth: pull failed:", err))
+      .finally(() => {
+        if (localStorage.getItem(UNSYNCED_KEY) === "1") schedulePush();
+      });
+  }
+
+  // Manual button: a forced pull (1 read) + push if needed (<=1 write).
+  async function syncNow() {
+    if (!auth) await api();
+    await ready;
+    if (!auth.currentUser) throw coded("sync/no-user", "Not signed in.");
+    if (pulling || pushing) throw coded("sync/busy", "Already syncing.");
+    if (syncStatus().waitMs > 0)
+      throw coded("sync/cooldown", "Please wait a bit.");
+    patchLog({ lastManual: Date.now() });
+    const r = await pull(true);
+    return { wrote: !!(r && r.wrote) };
+  }
+
+  // ---------- status + UI (optional elements, safe if missing) ----------
+  function syncStatus() {
+    const l = readLog();
+    const waitMs = Math.max(0, l.lastManual + MANUAL_COOLDOWN_MS - Date.now());
+    return {
+      last: Math.max(l.lastPull, l.lastPush),
+      waitMs,
+      remainingToday: Math.max(0, MAX_WRITES_PER_DAY - l.writes),
+      canSync: waitMs === 0 && !pulling && !pushing,
+      unsynced: localStorage.getItem(UNSYNCED_KEY) === "1",
+    };
+  }
+
   function ago(ts) {
     if (!ts) return "never";
     const m = Math.round((Date.now() - ts) / 60000);
@@ -448,30 +621,23 @@
     const st = syncStatus();
     if (btn) {
       btn.disabled = !st.canSync;
-      btn.textContent = syncing
-        ? "Syncing…"
-        : st.remainingToday === 0
-          ? "Daily limit reached"
+      btn.textContent =
+        pulling || pushing
+          ? "Syncing…"
           : st.waitMs > 0
-            ? "Sync again in " + Math.ceil(st.waitMs / 60000) + " min"
+            ? "Sync again in " + Math.ceil(st.waitMs / 1000) + "s"
             : st.unsynced
-              ? "Sync now (changes pending)"
+              ? "Sync now (saving soon)"
               : "Sync now";
     }
     if (label) {
       label.textContent =
         (message ? message + " · " : "") +
-        "Last synced: " +
-        ago(st.last) +
-        " · " +
-        st.remainingToday +
-        " sync" +
-        (st.remainingToday === 1 ? "" : "s") +
-        " left today";
+        "Auto-sync on · Last synced: " +
+        ago(st.last);
     }
-    // Re-check every 30s only while a cooldown is counting down.
     clearTimeout(syncTicker);
-    if (st.waitMs > 0) syncTicker = setTimeout(() => paintSyncUI(), 30000);
+    if (st.waitMs > 0) syncTicker = setTimeout(() => paintSyncUI(), 1000);
   }
 
   const SYNC_ERRORS = {
@@ -498,7 +664,15 @@
     paintSyncUI();
   }
 
-  // Any local change just flags "unsynced". No network involved.
+  // ---------- change tracking: flag + schedule a debounced push ----------
+  function markUnsynced() {
+    try {
+      localStorage.setItem(UNSYNCED_KEY, "1");
+    } catch {}
+    paintSyncUI();
+    schedulePush();
+  }
+
   if (MODE === "required") {
     const onFav = () => {
       if (applyingRemote) return;
@@ -517,13 +691,31 @@
     window.addEventListener("3nding:favorites-changed", onFav);
     window.addEventListener("3nding:settings-changed", onSettings);
     window.addEventListener("3nding:progress-changed", onProgress);
+
+    // Save when the person leaves; refresh (throttled) when they come back.
+    const flush = () => {
+      if (!auth || !auth.currentUser) return;
+      if (localStorage.getItem(UNSYNCED_KEY) === "1")
+        pushDirty({ minGap: FLUSH_MIN_GAP_MS }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") flush();
+      else if (auth && auth.currentUser) pull(false).catch(() => {});
+    });
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("online", () => {
+      if (localStorage.getItem(UNSYNCED_KEY) === "1") schedulePush();
+    });
   }
 
   // ---------- public API ----------
   async function signOut() {
     signingOut = true;
     try {
-      // Local data is wiped on sign-out, so warn if it was never synced.
+      // Push pending changes before local data is wiped.
+      try {
+        await pushDirty({ force: true });
+      } catch {}
       if (
         syncStatus().unsynced &&
         !confirm(
@@ -572,12 +764,6 @@
     if (!/^[a-z0-9_]+$/.test(n))
       return "Use only letters, numbers and underscores.";
     return "";
-  }
-
-  function coded(code, message) {
-    const e = new Error(message);
-    e.code = code;
-    return e;
   }
 
   // Works before sign-in: the rules allow reading a single username doc.
