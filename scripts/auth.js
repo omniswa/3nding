@@ -44,6 +44,9 @@
   const SYNC_MAX_PER_DAY = 10; // per browser, per calendar day
   const SYNCLOG_KEY = "3nding:sync-log";
   const UNSYNCED_KEY = "3nding:unsynced";
+  let sdkPromise = null; // <-- add
+  let auth = null; // <-- add
+  let db = null; // <-- add
   let syncing = false;
   let syncTicker = null;
   let applyingRemote = false;
