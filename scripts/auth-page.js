@@ -38,8 +38,6 @@
       "Your browser blocked the sign-in pop-up. Allow pop-ups for this site and try again.",
     "auth/operation-not-allowed": "This sign-in method isn't enabled yet.",
     "auth/unauthorized-domain": "This domain isn't authorized for sign-in yet.",
-    "username/unavailable": "Choose a valid, available username first.",
-    "username/taken": "That username isn't available. Try another.",
     "username/invalid": "That username isn't valid.",
   };
 
@@ -77,47 +75,29 @@
     }
   }
 
-  // ---------- username field ----------
+  // ---------- username field (format check only, no network) ----------
   const norm = () => uname.value.trim().toLowerCase();
-  let last = { name: "", ok: false }; // last availability result
-  let seq = 0;
-  let timer = null;
 
   function hint(text, state) {
     unameHint.textContent = text;
     unameHint.dataset.state = state || "";
   }
 
-  async function checkName() {
+  function checkName() {
     const name = norm();
-    const mine = ++seq;
     if (!name) {
       hint(MIN + "–" + MAX + " characters: letters, numbers, underscores.", "");
       return false;
     }
     const bad = Auth.validateUsername(name);
-    if (bad) {
-      hint(bad, "bad");
-      return false;
-    }
-    if (last.name === name) return last.ok; // cached, keeps the Google pop-up gesture-friendly
-    hint("Checking…", "");
-    try {
-      const ok = await Auth.isUsernameAvailable(name);
-      last = { name, ok };
-      if (mine === seq)
-        hint(ok ? "Available." : "Already taken.", ok ? "good" : "bad");
-      return ok;
-    } catch {
-      if (mine === seq) hint("Couldn't check right now. Try again.", "bad");
-      return false;
-    }
+    hint(bad || "Looks good.", bad ? "bad" : "good");
+    return !bad;
   }
 
-  async function requireName() {
-    if (await checkName()) return;
-    const e = new Error("unavailable");
-    e.code = "username/unavailable";
+  function requireName() {
+    if (checkName()) return;
+    const e = new Error("invalid username");
+    e.code = "username/invalid";
     uname.focus();
     throw e;
   }
@@ -125,8 +105,7 @@
   if (uname) {
     uname.addEventListener("input", () => {
       uname.value = uname.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
-      clearTimeout(timer);
-      timer = setTimeout(checkName, 350);
+      checkName();
     });
   }
 
@@ -205,11 +184,8 @@
   if (swap && location.search) swap.search = location.search;
 
   if (mode === "setup") {
-    if (new URLSearchParams(location.search).get("reason") === "taken") {
-      show(
-        errBox,
-        "That username was taken while you were signing up. Please choose another.",
-      );
+    if (new URLSearchParams(location.search).get("reason") === "failed") {
+      show(errBox, "We couldn't save that username. Please try again.");
     }
   } else {
     Auth.ready.then((user) => {

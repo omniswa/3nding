@@ -779,13 +779,6 @@
     return "";
   }
 
-  // Works before sign-in: the rules allow reading a single username doc.
-  async function isUsernameAvailable(raw) {
-    await api();
-    const snap = await db.collection("usernames").doc(normalizeName(raw)).get();
-    return !snap.exists;
-  }
-
   async function claimUsername(raw) {
     const name = normalizeName(raw);
     const bad = validateUsername(name);
@@ -793,37 +786,21 @@
     await api();
     const user = auth.currentUser;
     if (!user) throw coded("username/no-user", "Not signed in.");
-    // Both writes must be in ONE batch: the security rules check that the
-    // users doc ends up pointing at the same name.
-    const batch = db.batch();
-    batch.set(db.collection("usernames").doc(name), { uid: user.uid });
-    batch.set(
-      db.collection("users").doc(user.uid),
-      { username: name },
-      { merge: true },
+    // One write, no lookups: the name is only a display label.
+    await withTimeout(
+      docRef(user.uid).set({ username: name }, { merge: true }),
+      NETWORK_TIMEOUT_MS,
     );
-    try {
-      await batch.commit();
-    } catch (err) {
-      if (err.code === "permission-denied")
-        throw coded("username/taken", "That username isn't available.");
-      throw err;
-    }
     try {
       localStorage.setItem(UNAME_KEY, JSON.stringify({ uid: user.uid, name }));
     } catch {}
     return name;
   }
 
-  // Account exists but the username couldn't be claimed (e.g. lost a race):
-  // send them to the setup page rather than leaving them without one.
-  async function claimAfterSignup(user, username) {
-    if (!username) return;
-    let existing = "";
-    try {
-      existing = await usernameFor(user);
-    } catch {} // unknown -> attempt the claim; the rules reject it if one exists
-    if (existing) return;
+  // Only brand-new accounts need a username written. Returning accounts
+  // skip this entirely (no read, no write); the gate handles them.
+  async function claimAfterSignup(user, username, isNewUser) {
+    if (!username || !isNewUser) return;
     try {
       await claimUsername(username);
     } catch (err) {
@@ -835,7 +812,7 @@
   function setupUrl() {
     const u = new URL(SETUP);
     u.searchParams.set("next", nextUrl());
-    u.searchParams.set("reason", "taken");
+    u.searchParams.set("reason", "failed");
     return u.href;
   }
 
@@ -846,21 +823,23 @@
     signOut,
     USERNAME: { min: UNAME_MIN, max: UNAME_MAX },
     validateUsername,
-    isUsernameAvailable,
     claimUsername,
     async signInWithGoogle(username) {
       const a = await api();
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       const cred = await a.signInWithPopup(provider);
-      await claimAfterSignup(cred.user, username);
+      const isNew = !!(
+        cred.additionalUserInfo && cred.additionalUserInfo.isNewUser
+      );
+      await claimAfterSignup(cred.user, username, isNew);
       return cred;
     },
     async signUpWithEmail(email, password, username) {
       const cred = await (
         await api()
       ).createUserWithEmailAndPassword(email, password);
-      await claimAfterSignup(cred.user, username);
+      await claimAfterSignup(cred.user, username, true);
       return cred;
     },
     async signInWithEmail(email, password) {
