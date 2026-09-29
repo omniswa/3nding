@@ -86,6 +86,7 @@ body::before {
   color: var(--brass-bright);
   font-weight: 600;
   letter-spacing: 0.14em;
+  text-decoration: none;
 }
 
 .topbar a:not(.brand) {
@@ -110,7 +111,9 @@ main {
 .sheet {
   background: var(--paper);
   border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px -18px rgba(0, 0, 0, 0.7);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 12px 30px -18px rgba(0, 0, 0, 0.7);
 }
 
 .sheet-head {
@@ -256,7 +259,9 @@ form {
   border-radius: var(--radius);
   padding: 0.8rem 1.2rem;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .btn-primary {
@@ -406,7 +411,16 @@ footer a:hover {
   }
 }
 
-.hint[data-state="good"] { color: var(--moss); }
-.hint[data-state="bad"] { color: var(--danger); }
-.swap .link-btn { color: var(--brass-bright); border-bottom-color: rgba(212, 172, 87, 0.5); }
-.swap .link-btn:hover { color: var(--text-light, #ece4d1); }
+.hint[data-state="good"] {
+  color: var(--moss);
+}
+.hint[data-state="bad"] {
+  color: var(--danger);
+}
+.swap .link-btn {
+  color: var(--brass-bright);
+  border-bottom-color: rgba(212, 172, 87, 0.5);
+}
+.swap .link-btn:hover {
+  color: var(--text-light, #ece4d1);
+}

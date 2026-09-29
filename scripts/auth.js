@@ -44,7 +44,7 @@
   const SETTINGS_KEY = "3nding:settings";
   const PROGRESS_PREFIX = "3nding:progress:";
   const UNAME_KEY = "3nding:username";
-  const UNAME_MIN = 12;
+  const UNAME_MIN = 6;
   const UNAME_MAX = 14;
 
   // Sync tuning
