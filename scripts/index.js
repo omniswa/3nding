@@ -223,7 +223,9 @@
   }
 
   function setStatus(text, animated) {
-    status.innerHTML = animated ? `<span class="dot"></span> ${text}` : text;
+    if (animated)
+      status.innerHTML = `<span class="dot"></span> ${text}`; // static strings only
+    else status.textContent = text;
   }
 
   function applyFilter(resetPage) {
