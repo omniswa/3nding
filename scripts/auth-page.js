@@ -4,7 +4,7 @@
   const form = $("authForm");
   if (!form || !window.Auth) return;
 
-  const mode = form.dataset.mode; // "login" | "signup" | "setup"
+  const mode = form.dataset.mode;
   const errBox = $("formError");
   const infoBox = $("formInfo");
   const submitBtn = $("submitBtn");
@@ -58,9 +58,8 @@
     setBusy(true);
     try {
       await task();
-      location.replace(Auth.nextUrl()); // stay "busy" while we navigate
+      location.replace(Auth.nextUrl());
     } catch (err) {
-      // Account exists but its username was lost to someone else: finish on the setup page.
       if (err.accountCreated) return location.replace(Auth.setupUrl());
       setBusy(false);
       if (!SILENT.has(err.code)) {
@@ -72,7 +71,7 @@
     }
   }
 
-  // ---------- username field (format check only, no network) ----------
+  // ---------- username field ----------
   const norm = () => uname.value.trim().toLowerCase();
 
   function hint(text, state) {
@@ -122,7 +121,7 @@
       if (password.value !== confirmPw.value)
         return show(errBox, "Those passwords don't match.");
       run(async () => {
-        await requireName(); // nothing is created until the username is free
+        await requireName();
         await Auth.signUpWithEmail(em, password.value, norm());
       });
     } else {

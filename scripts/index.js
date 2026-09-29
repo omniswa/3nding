@@ -18,18 +18,18 @@
   const drawerCloseBtn = document.getElementById("drawerCloseBtn");
 
   const SKELETON_COUNT = 10;
-  const MIN_LOADING_MS = 450; // keeps the skeleton from flashing on fast connections
-  const PAGE_SIZE = 10; // books shown per page; keeps pagination visibly working even on a small catalog
+  const MIN_LOADING_MS = 450; 
+  const PAGE_SIZE = 10; 
   const FAVORITES_KEY = "3nding:favorites";
+  const REMOVED_KEY = "3nding:favorites-removed";
 
   let allBooks = [];
   let favorites = loadFavorites();
+  let removed = loadRemoved();
   let favoritesOnly = false;
   let currentPage = 1;
   let lastMatches = [];
 
-  // Escape any string before it goes into innerHTML, so titles/authors
-  // from books.json can never be interpreted as markup.
   function escapeHtml(str) {
     return String(str).replace(
       /[&<>"']/g,
@@ -51,7 +51,6 @@
       if (!raw) return new Map();
       const parsed = JSON.parse(raw);
 
-      // Support old array format (e.g. ["1", "2"]) if upgrading
       if (Array.isArray(parsed)) {
         return new Map(parsed.map((id, index) => [String(id), index]));
       }
@@ -61,14 +60,27 @@
     }
   }
 
+  function loadRemoved() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(REMOVED_KEY) || "{}");
+      const ok = parsed && typeof parsed === "object" && !Array.isArray(parsed);
+      return new Map(Object.entries(ok ? parsed : {}));
+    } catch {
+      return new Map();
+    }
+  }
+
   function saveFavorites() {
     try {
-      const obj = Object.fromEntries(favorites);
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(obj));
+      localStorage.setItem(
+        FAVORITES_KEY,
+        JSON.stringify(Object.fromEntries(favorites)),
+      );
+      localStorage.setItem(
+        REMOVED_KEY,
+        JSON.stringify(Object.fromEntries(removed)),
+      );
     } catch {}
-    // Let the optional cloud sync module know something changed locally,
-    // so it can push the update if the person has signed in. Harmless
-    // no-op if cloud-sync.js isn't loaded or nobody's listening.
     window.dispatchEvent(new CustomEvent("3nding:favorites-changed"));
   }
 
@@ -84,15 +96,15 @@
     const key = String(id);
     if (favorites.has(key)) {
       favorites.delete(key);
+      removed.set(key, Date.now());
     } else {
-      // Store the current timestamp when favorited
       favorites.set(key, Date.now());
+      removed.delete(key);
     }
     saveFavorites();
     updateFavCount();
 
     if (favoritesOnly) {
-      // The favorites-only list membership just changed, so recompute it.
       applyFilter(false);
       return;
     }
@@ -224,7 +236,7 @@
 
   function setStatus(text, animated) {
     if (animated)
-      status.innerHTML = `<span class="dot"></span> ${text}`; // static strings only
+      status.innerHTML = `<span class="dot"></span> ${text}`;
     else status.textContent = text;
   }
 
@@ -240,8 +252,7 @@
         .sort((a, b) => {
           const timeA = favorites.get(String(a.id)) || 0;
           const timeB = favorites.get(String(b.id)) || 0;
-          return timeB - timeA; // Newest favorited first
-          // (Change to `timeA - timeB` if you want oldest favorited first)
+          return timeB - timeA; 
         });
     }
 
@@ -295,10 +306,9 @@
     applyFilter(true);
   });
 
-  // If the optional cloud sync module pulls in favorites from another
-  // device, refresh what's on screen to match.
   window.addEventListener("3nding:cloud-updated", () => {
     favorites = loadFavorites();
+    removed = loadRemoved();
     updateFavCount();
     applyFilter(false);
   });

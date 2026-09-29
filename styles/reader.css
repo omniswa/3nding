@@ -506,10 +506,9 @@ body.theme-dark {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    transition: none !important;
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
   }
 }
 
@@ -568,9 +567,15 @@ body.theme-dark {
   min-height: 1.5em;
 }
 
-.sync-note[data-state="dirty"] { color: var(--brass-bright); }
-.sync-note[data-state="good"]  { color: #8fb59d; }
-.sync-note[data-state="error"] { color: #e0857f; }
+.sync-note[data-state="dirty"] {
+  color: var(--brass-bright);
+}
+.sync-note[data-state="good"] {
+  color: #8fb59d;
+}
+.sync-note[data-state="error"] {
+  color: #e0857f;
+}
 
 .sync-dialog {
   width: min(360px, 90vw);
@@ -581,7 +586,9 @@ body.theme-dark {
   border-radius: var(--radius);
 }
 
-.sync-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.sync-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
 
 .sync-dialog h2 {
   font-family: "Fraunces", serif;
@@ -607,7 +614,64 @@ body.theme-dark {
   max-width: 420px;
   margin: 20vh auto;
   padding: 0 1.25rem;
-  font: 0.9rem/1.6 "Space Mono", monospace;
+  font:
+    0.9rem/1.6 "Space Mono",
+    monospace;
   color: var(--text-light);
   text-align: center;
+}
+
+/* progress prompt */
+
+.resume-banner {
+  position: fixed;
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 2rem));
+  z-index: 25;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  background: var(--ink-soft);
+  color: var(--text-light);
+  border: 1px solid rgba(184, 146, 63, 0.35);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  font:
+    0.8rem/1.5 "Space Mono",
+    monospace;
+}
+
+.resume-banner p {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.resume-btn {
+  flex: 1;
+  min-height: 44px;
+  font: inherit;
+  color: var(--text-light);
+  background: transparent;
+  border: 1px solid rgba(184, 146, 63, 0.35);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.resume-btn:hover {
+  border-color: var(--brass-bright);
+}
+
+.resume-btn.is-primary {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.resume-btn:focus-visible {
+  outline: 2px solid var(--brass-bright);
+  outline-offset: 2px;
 }

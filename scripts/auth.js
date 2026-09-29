@@ -1,23 +1,5 @@
-/**
- * Authentication + MANUAL account-linked sync.
- *
- * data-auth="required"  -> page is gated. Signed-out visitors are sent to
- *                          the login page.
- * data-auth="guest"     -> login / signup pages.
- * data-auth="setup"     -> username picker page.
- *
- * Sync model (built to keep Firestore usage minimal):
- *  - localStorage is the working copy. Nothing touches Firestore
- *    automatically: no pull on load, no timers, no listeners.
- *  - "Save to cloud"  = 1 read + at most 1 write. Skipped entirely (0 ops)
- *    when nothing changed on this device since the last sync.
- *  - "Load from cloud" = 1 read, 0 writes.
- *  - Both merge with "newest wins" so neither direction destroys newer data.
- *  - Signing out clears this device's data, so unsaved changes trigger a
- *    confirmation first.
- */
 (function () {
-  "use strict";
+  ("use strict");
 
   const script = document.currentScript;
   const MODE = (script && script.dataset.auth) || "required";
@@ -41,12 +23,14 @@
   const SETTINGS_KEY = "3nding:settings";
   const PROGRESS_PREFIX = "3nding:progress:";
   const UNAME_KEY = "3nding:username";
+  const REMOVED_KEY = "3nding:favorites-removed";
+  const TOMBSTONE_TTL_MS = 180 * 24 * 60 * 60 * 1000;
   const UNAME_MIN = 6;
   const UNAME_MAX = 14;
   const SETTING_KEYS = ["font", "size", "align", "theme"];
 
-  const NETWORK_TIMEOUT_MS = 8000; // never let a hung request block the UI
-  const ACTION_COOLDOWN_MS = 5000; // per-action spam guard
+  const NETWORK_TIMEOUT_MS = 8000; 
+  const ACTION_COOLDOWN_MS = 5000; 
 
   let sdkPromise = null;
   let auth = null;
@@ -54,6 +38,7 @@
   let signingOut = false;
   let firstEvent = true;
   let busy = false;
+  let changeSeq = 0;
   let resolveReady;
   const ready = new Promise((r) => (resolveReady = r));
   const lastRun = { save: 0, load: 0 };
@@ -107,8 +92,6 @@
     return out;
   }
 
-  // Only known keys with primitive values are ever synced (matches the
-  // Firestore rule that caps settings at 10 keys).
   function sanitizeSettings(raw) {
     if (!isPlainObject(raw)) return null;
     const out = {};
@@ -141,13 +124,12 @@
     });
   }
 
-  // app-compat must come first; auth and firestore can download in parallel.
   function loadSdk() {
     if (sdkPromise) return sdkPromise;
     sdkPromise = loadScript(SDK_CORE)
       .then(() => Promise.all(SDK_SERVICES.map(loadScript)))
       .catch((err) => {
-        sdkPromise = null; // allow a retry
+        sdkPromise = null; 
         throw err;
       });
     return sdkPromise;
@@ -203,10 +185,6 @@
     location.replace(u.href);
   }
 
-  // The username lives on users/<uid>; cache it so pages don't re-read it.
-  // Returns the name, or "" if the account genuinely has none yet.
-  // THROWS if the lookup failed, so a network blip is never mistaken for
-  // "this account has no username" (which would send the reader to setup).
   async function usernameFor(user) {
     try {
       const c = JSON.parse(localStorage.getItem(UNAME_KEY) || "null");
@@ -239,7 +217,7 @@
           console.warn("Auth: couldn't read username:", err);
           return showGateError();
         }
-        if (!name) return redirectToSetup(); // every account needs a username
+        if (!name) return redirectToSetup();
         renderAccount(user, name);
         reveal();
       } else if (MODE === "setup") {
@@ -266,11 +244,17 @@
   // ---------- local storage ----------
   function readLocal() {
     let favorites = {},
+      favoritesRemoved = {},
       settings = null;
     const progress = {};
     try {
       favorites = sanitizeFavorites(
         JSON.parse(localStorage.getItem(FAVORITES_KEY) || "{}"),
+      );
+    } catch {}
+    try {
+      favoritesRemoved = sanitizeFavorites(
+        JSON.parse(localStorage.getItem(REMOVED_KEY) || "{}"),
       );
     } catch {}
     try {
@@ -287,11 +271,9 @@
         } catch {}
       }
     }
-    return { favorites, settings, progress };
+    return { favorites, favoritesRemoved, settings, progress };
   }
 
-  // Writes only what actually differs, and only announces a change if there
-  // was one, so pages don't re-render (and replay animations) for nothing.
   function writeLocal(data) {
     let changed = false;
     const put = (key, value) => {
@@ -302,6 +284,7 @@
     };
     try {
       if (data.favorites) put(FAVORITES_KEY, data.favorites);
+      if (data.favoritesRemoved) put(REMOVED_KEY, data.favoritesRemoved);
       if (data.settings) put(SETTINGS_KEY, data.settings);
       Object.keys(data.progress || {}).forEach((id) =>
         put(PROGRESS_PREFIX + id, data.progress[id]),
@@ -317,7 +300,13 @@
   }
 
   function clearLocal() {
-    const doomed = [FAVORITES_KEY, SETTINGS_KEY, META_KEY, UNAME_KEY];
+    const doomed = [
+      FAVORITES_KEY,
+      REMOVED_KEY,
+      SETTINGS_KEY,
+      META_KEY,
+      UNAME_KEY,
+    ];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && k.indexOf(PROGRESS_PREFIX) === 0) doomed.push(k);
@@ -325,8 +314,6 @@
     doomed.forEach((k) => localStorage.removeItem(k));
   }
 
-  // If a different reader signs in on this browser, don't let the
-  // previous reader's data bleed into their account.
   function claimLocal(uid) {
     const prev = localStorage.getItem(UID_KEY);
     if (prev && prev !== uid) clearLocal();
@@ -355,13 +342,12 @@
     const l = readLocal();
     return (
       Object.keys(l.favorites).length > 0 ||
+      Object.keys(l.favoritesRemoved).length > 0 ||
       Object.keys(l.progress).length > 0 ||
       !!l.settings
     );
   }
 
-  // True when this device has changes the cloud copy may not have.
-  // Also true for pre-existing local data that has never been synced.
   function hasUnsynced() {
     const m = readMeta();
     if (m.unsynced === true) return true;
@@ -369,8 +355,6 @@
   }
 
   // ---------- merge rules ----------
-  // Whole-value, last-writer-wins (favorites, settings).
-  // `localWon` means local is genuinely newer and must be uploaded.
   function mergeWhole(local, remote, localTs, remoteTs) {
     localTs = localTs || 0;
     remoteTs = remoteTs || 0;
@@ -388,7 +372,34 @@
     return { value: local, ts: localTs, localWon: localTs > remoteTs };
   }
 
-  // Per-book, newest updatedAt wins. Returns the ids local should upload.
+  function mergeFavorites(a, b, now) {
+    const favorites = {};
+    const removed = {};
+    const ids = new Set([
+      ...Object.keys(a.favorites),
+      ...Object.keys(a.removed),
+      ...Object.keys(b.favorites),
+      ...Object.keys(b.removed),
+    ]);
+    ids.forEach((id) => {
+      const addedAt = Math.max(a.favorites[id] || 0, b.favorites[id] || 0);
+      const removedAt = Math.max(a.removed[id] || 0, b.removed[id] || 0);
+      if (addedAt > 0 && addedAt >= removedAt) {
+        favorites[id] = addedAt;
+      } else if (removedAt > 0 && now - removedAt < TOMBSTONE_TTL_MS) {
+        removed[id] = removedAt;
+      }
+    });
+    return { favorites, removed };
+  }
+
+  function sameMap(x, y) {
+    const kx = Object.keys(x);
+    return (
+      kx.length === Object.keys(y).length && kx.every((k) => x[k] === y[k])
+    );
+  }
+
   function mergeProgress(local, remote) {
     const merged = Object.assign({}, remote);
     const localWins = [];
@@ -406,18 +417,23 @@
   function planMerge(remoteRaw) {
     const local = readLocal();
     const meta = readMeta();
-    const remoteFavorites =
-      remoteRaw.favorites == null
-        ? null
-        : sanitizeFavorites(remoteRaw.favorites);
+    const remoteFav = sanitizeFavorites(remoteRaw.favorites);
+    const remoteRem = sanitizeFavorites(remoteRaw.favoritesRemoved);
+
+    const fav = mergeFavorites(
+      { favorites: local.favorites, removed: local.favoritesRemoved },
+      { favorites: remoteFav, removed: remoteRem },
+      Date.now(),
+    );
 
     return {
-      fav: mergeWhole(
-        local.favorites,
-        remoteFavorites,
-        meta.favoritesUpdatedAt,
-        remoteRaw.favoritesUpdatedAt,
-      ),
+      fav: {
+        value: fav.favorites,
+        removed: fav.removed,
+        needsUpload:
+          !sameMap(fav.favorites, remoteFav) ||
+          !sameMap(fav.removed, remoteRem),
+      },
       sett: mergeWhole(
         local.settings,
         sanitizeSettings(remoteRaw.settings),
@@ -431,13 +447,38 @@
   function applyLocal(plan) {
     writeLocal({
       favorites: plan.fav.value,
+      favoritesRemoved: plan.fav.removed,
       settings: plan.sett.value,
       progress: plan.prog.merged,
     });
-    setMeta({
-      favoritesUpdatedAt: plan.fav.ts,
-      settingsUpdatedAt: plan.sett.ts,
-    });
+    setMeta({ settingsUpdatedAt: plan.sett.ts });
+  }
+
+  function buildUpload(plan) {
+    const { FieldPath } = firebase.firestore;
+    const data = {};
+    const fields = [];
+    let settingsTs = null;
+
+    if (plan.fav.needsUpload) {
+      data.favorites = plan.fav.value;
+      data.favoritesRemoved = plan.fav.removed;
+      fields.push("favorites", "favoritesRemoved");
+    }
+    if (plan.sett.localWon && plan.sett.value) {
+      settingsTs = plan.sett.ts || Date.now();
+      data.settings = plan.sett.value;
+      data.settingsUpdatedAt = settingsTs;
+      fields.push("settings", "settingsUpdatedAt");
+    }
+    if (plan.prog.localWins.length) {
+      data.progress = {};
+      plan.prog.localWins.forEach((id) => {
+        data.progress[id] = plan.prog.merged[id];
+        fields.push(new FieldPath("progress", id));
+      });
+    }
+    return { data, fields, settingsTs };
   }
 
   const docRef = (uid) => db.collection("users").doc(uid);
@@ -449,54 +490,36 @@
 
   // ---------- manual sync operations ----------
   async function saveToCloud(user) {
-    const remote = await fetchRemote(user.uid); // 1 read
-    const plan = planMerge(remote.data);
+    const seq = changeSeq;
+    const ref = docRef(user.uid);
+    let plan = null;
+    let upload = null;
+
+    await withTimeout(
+      db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        plan = planMerge(snap.exists ? snap.data() || {} : {});
+        upload = buildUpload(plan);
+        if (upload.fields.length) {
+          tx.set(ref, upload.data, { mergeFields: upload.fields });
+        }
+      }),
+      NETWORK_TIMEOUT_MS,
+    );
+
     applyLocal(plan);
-
-    const data = {};
-    const fields = [];
-    const { FieldPath } = firebase.firestore;
-
-    // mergeFields with a top-level name REPLACES that whole map, so removed
-    // favorites really disappear.
-    if (plan.fav.localWon) {
-      const ts = plan.fav.ts || Date.now();
-      data.favorites = plan.fav.value;
-      data.favoritesUpdatedAt = ts;
-      fields.push("favorites", "favoritesUpdatedAt");
-      setMeta({ favoritesUpdatedAt: ts });
-    }
-    if (plan.sett.localWon && plan.sett.value) {
-      const ts = plan.sett.ts || Date.now();
-      data.settings = plan.sett.value;
-      data.settingsUpdatedAt = ts;
-      fields.push("settings", "settingsUpdatedAt");
-      setMeta({ settingsUpdatedAt: ts });
-    }
-    if (plan.prog.localWins.length) {
-      data.progress = {};
-      plan.prog.localWins.forEach((id) => {
-        data.progress[id] = plan.prog.merged[id];
-        fields.push(new FieldPath("progress", id)); // touch only this book
-      });
-    }
-
-    if (fields.length) {
-      await withTimeout(
-        docRef(user.uid).set(data, { mergeFields: fields }), // 1 write
-        NETWORK_TIMEOUT_MS,
-      );
-    }
-    setMeta({ unsynced: false, lastSyncAt: Date.now() });
+    if (upload.settingsTs) setMeta({ settingsUpdatedAt: upload.settingsTs });
+    setMeta({ unsynced: changeSeq !== seq, lastSyncAt: Date.now() });
     return {
-      message: fields.length
+      message: upload.fields.length
         ? "Saved to the cloud."
         : "The cloud already has your latest data.",
     };
   }
 
   async function loadFromCloud(user) {
-    const remote = await fetchRemote(user.uid); // 1 read, no write
+    const seq = changeSeq;
+    const remote = await fetchRemote(user.uid);
     if (
       !remote.exists ||
       !Object.keys(remote.data).some((k) => k !== "username")
@@ -508,8 +531,13 @@
     const plan = planMerge(remote.data);
     applyLocal(plan);
     const localOnly =
-      plan.fav.localWon || plan.sett.localWon || plan.prog.localWins.length > 0;
-    setMeta({ lastSyncAt: Date.now(), unsynced: localOnly });
+      plan.fav.needsUpload ||
+      plan.sett.localWon ||
+      plan.prog.localWins.length > 0;
+    setMeta({
+      lastSyncAt: Date.now(),
+      unsynced: localOnly || changeSeq !== seq,
+    });
     return {
       message: localOnly
         ? "Loaded. Some newer changes on this device are still unsaved."
@@ -642,8 +670,6 @@
     if (MODE === "required") renderIdleStatus();
   }
 
-  // Modal choice dialog built on the native <dialog> element.
-  // Resolves with the chosen action id; Esc / backdrop close = "cancel".
   function askChoice({ title, message, actions }) {
     return new Promise((resolve) => {
       const dlg = document.createElement("dialog");
@@ -688,6 +714,8 @@
 
   // ---------- change tracking (local only, zero network) ----------
   function markUnsynced(patch) {
+    if (signingOut) return; 
+    changeSeq++;
     const m = readMeta();
     if (m.unsynced === true && !patch) return;
     setMeta(Object.assign({ unsynced: true }, patch));
@@ -695,14 +723,11 @@
   }
 
   if (MODE === "required") {
-    window.addEventListener("3nding:favorites-changed", () =>
-      markUnsynced({ favoritesUpdatedAt: Date.now() }),
-    );
+    window.addEventListener("3nding:favorites-changed", () => markUnsynced());
     window.addEventListener("3nding:settings-changed", () =>
       markUnsynced({ settingsUpdatedAt: Date.now() }),
     );
     window.addEventListener("3nding:progress-changed", () => markUnsynced());
-    // Keep the indicator right when another tab changes something.
     window.addEventListener("storage", (e) => {
       if (e.key === META_KEY && !busy) renderIdleStatus();
     });
@@ -734,13 +759,19 @@
       }
     }
     signingOut = true;
+    window.dispatchEvent(
+      new CustomEvent("3nding:signout-state", { detail: { active: true } }),
+    );
     try {
       await auth.signOut();
-      clearLocal(); // UID_KEY is kept on purpose; see claimLocal()
+      clearLocal();
       location.replace(LOGIN);
       return true;
     } catch (err) {
       signingOut = false;
+      window.dispatchEvent(
+        new CustomEvent("3nding:signout-state", { detail: { active: false } }),
+      );
       throw err;
     }
   }
@@ -761,8 +792,6 @@
   }
 
   // ---------- usernames ----------
-  // Stored lowercase. usernames/<name> = { uid } is the uniqueness lock;
-  // Firestore rules refuse a second write to the same document.
   const normalizeName = (raw) =>
     String(raw || "")
       .trim()
@@ -786,7 +815,6 @@
     await api();
     const user = auth.currentUser;
     if (!user) throw coded("username/no-user", "Not signed in.");
-    // One write, no lookups: the name is only a display label.
     await withTimeout(
       docRef(user.uid).set({ username: name }, { merge: true }),
       NETWORK_TIMEOUT_MS,
@@ -797,8 +825,6 @@
     return name;
   }
 
-  // Only brand-new accounts need a username written. Returning accounts
-  // skip this entirely (no read, no write); the gate handles them.
   async function claimAfterSignup(user, username, isNewUser) {
     if (!username || !isNewUser) return;
     try {
