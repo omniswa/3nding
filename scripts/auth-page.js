@@ -27,15 +27,12 @@
     "auth/invalid-credential": "Email or password is incorrect.",
     "auth/wrong-password": "Email or password is incorrect.",
     "auth/user-not-found": "Email or password is incorrect.",
-    "auth/email-already-in-use":
-      "An account with that email already exists. Try signing in instead.",
-    "auth/weak-password": "Choose a stronger password (at least 8 characters).",
-    "auth/too-many-requests": "Too many attempts. Wait a moment and try again.",
-    "auth/network-request-failed":
-      "Network problem. Check your connection and try again.",
+    "auth/email-already-in-use": "An account with that email already exists.",
+    "auth/weak-password": "Choose a stronger password.",
+    "auth/too-many-requests": "Too many attempts. Wait and try again.",
+    "auth/network-request-failed": "Network problem. Check your connection.",
     "auth/user-disabled": "This account has been disabled.",
-    "auth/popup-blocked":
-      "Your browser blocked the sign-in pop-up. Allow pop-ups for this site and try again.",
+    "auth/popup-blocked": "Sign-in is pop-up blocked the. Allow pop-ups.",
     "auth/operation-not-allowed": "This sign-in method isn't enabled yet.",
     "auth/unauthorized-domain": "This domain isn't authorized for sign-in yet.",
     "username/invalid": "That username isn't valid.",

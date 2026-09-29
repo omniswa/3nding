@@ -1,42 +1,93 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <script>document.documentElement.classList.add("auth-pending");</script>
-  <style>html.auth-pending body{visibility:hidden}</style>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3NDING — Choose a username</title>
-  <meta name="robots" content="noindex, follow" />
-  <meta name="theme-color" content="#171b21" />
-  <link rel="stylesheet" href="../styles/auth.css" />
-  <link rel="preload" href="../fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="../fonts/worksans.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="../fonts/spacemono.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="icon" href="../apple-touch-icon.png" type="image/png" />
-</head>
-<body>
-  <div class="topbar"><div class="topbar-inner"><a href="../index.html" class="brand">3NDING</a></div></div>
-  <main>
-    <div class="sheet">
-      <div class="sheet-head">
-        <div class="eyebrow">One Last Step</div>
-        <h1>Pick your name.</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      document.documentElement.classList.add("auth-pending");
+    </script>
+    <style>
+      html.auth-pending body {
+        visibility: hidden;
+      }
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3NDING — Choose a username</title>
+    <meta name="robots" content="noindex, follow" />
+    <meta name="theme-color" content="#171b21" />
+    <link rel="stylesheet" href="../styles/auth.css" />
+    <link
+      rel="preload"
+      href="../fonts/fraunces.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="../fonts/worksans.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="../fonts/spacemono.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="icon" href="../apple-touch-icon.png" type="image/png" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <a href="../index.html" class="brand">3NDING</a>
       </div>
-      <form id="authForm" data-mode="setup" novalidate>
-        <div class="notice error" id="formError" role="alert" hidden></div>
-        <div class="field">
-          <label for="username">Username</label>
-          <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="6" maxlength="14" required />
-          <p class="hint" id="usernameHint" aria-live="polite">6–14 characters: letters, numbers, underscores.</p>
-        </div>
-        <button type="submit" class="btn btn-primary" id="submitBtn" data-label="Claim username" data-busy="Saving…">Claim username</button>
-      </form>
     </div>
-    <p class="swap"><span id="accountEmail">Signed in</span> · <button type="button" class="link-btn" id="signOutBtn">Sign out</button></p>
-  </main>
-  <footer>3NDING — a public archive, lovingly overdue.</footer>
-  <script src="../scripts/firebase-config.js" defer></script>
-  <script src="../scripts/auth.js" data-auth="setup" defer></script>
-  <script src="../scripts/auth-page.js" defer></script>
-</body>
+    <main>
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="eyebrow">One Last Step</div>
+          <h1>Pick your name.</h1>
+        </div>
+        <form id="authForm" data-mode="setup" novalidate>
+          <div class="notice error" id="formError" role="alert" hidden></div>
+          <div class="field">
+            <label for="username">Username</label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              minlength="6"
+              maxlength="14"
+              required
+            />
+            <p class="hint" id="usernameHint" aria-live="polite">
+              6–14 characters: letters, numbers, underscores.
+            </p>
+          </div>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            id="submitBtn"
+            data-label="Claim username"
+            data-busy="Saving…"
+          >
+            Claim username
+          </button>
+        </form>
+      </div>
+      <p class="swap">
+        <span id="accountEmail">Signed in</span> ·
+        <button type="button" class="link-btn" id="signOutBtn">Sign out</button>
+      </p>
+    </main>
+    <footer>3NDING — a public archive, lovingly overdue.</footer>
+    <script src="../scripts/firebase-config.js" defer></script>
+    <script src="../scripts/auth.js" data-auth="setup" defer></script>
+    <script src="../scripts/auth-page.js" defer></script>
+  </body>
 </html>
