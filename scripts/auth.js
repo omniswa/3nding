@@ -1,23 +1,20 @@
 /**
- * Authentication + account-linked sync.
+ * Authentication + MANUAL account-linked sync.
  *
  * data-auth="required"  -> page is gated. Signed-out visitors are sent to
- *                          the login page; signed-in readers get their
- *                          favorites / progress / settings synced.
- * data-auth="guest"     -> login / signup pages. No syncing, no redirect
- *                          (the page script decides where to go next).
+ *                          the login page.
+ * data-auth="guest"     -> login / signup pages.
  * data-auth="setup"     -> username picker page.
  *
- * Sync model (built to keep Firestore usage low):
- *  - localStorage is what the UI renders; Firestore "users/<uid>" is the
- *    cross-device copy.
- *  - PULL: one document read per page load, skipped if we pulled less than
- *    PULL_MIN_INTERVAL_MS ago, and again when a hidden tab becomes visible.
- *    No real-time listener (a listener bills a read on every remote write).
- *  - PUSH: only what changed (dirty tracking), throttled, and flushed when
- *    the page is hidden. Progress is written per book via field paths so a
- *    stale entry can never overwrite a newer one for a different book.
- *  - Nothing is written on page load unless local data is newer than remote.
+ * Sync model (built to keep Firestore usage minimal):
+ *  - localStorage is the working copy. Nothing touches Firestore
+ *    automatically: no pull on load, no timers, no listeners.
+ *  - "Save to cloud"  = 1 read + at most 1 write. Skipped entirely (0 ops)
+ *    when nothing changed on this device since the last sync.
+ *  - "Load from cloud" = 1 read, 0 writes.
+ *  - Both merge with "newest wins" so neither direction destroys newer data.
+ *  - Signing out clears this device's data, so unsaved changes trigger a
+ *    confirmation first.
  */
 (function () {
   "use strict";
@@ -46,32 +43,21 @@
   const UNAME_KEY = "3nding:username";
   const UNAME_MIN = 6;
   const UNAME_MAX = 14;
+  const SETTING_KEYS = ["font", "size", "align", "theme"];
 
-  // Sync tuning
-  const PUSH_DELAY_FAST_MS = 2000; // favorites / settings: should feel instant
-  const PUSH_DELAY_PROGRESS_MS = 30000; // progress: at most ~1 write per 30 s while reading
-  const PUSH_RETRY_MS = 60000; // retry after a transient network failure
-  const PULL_MIN_INTERVAL_MS = 60000; // don't re-read the doc more than once a minute
   const NETWORK_TIMEOUT_MS = 8000; // never let a hung request block the UI
-  const RETRYABLE_CODES = new Set([
-    "unavailable",
-    "deadline-exceeded",
-    "sync/timeout",
-  ]);
+  const ACTION_COOLDOWN_MS = 5000; // per-action spam guard
 
   let sdkPromise = null;
   let auth = null;
   let db = null;
-  let pushTimer = null;
-  let pushDueAt = 0;
-  let syncInFlight = null;
   let signingOut = false;
   let firstEvent = true;
+  let busy = false;
   let resolveReady;
   const ready = new Promise((r) => (resolveReady = r));
-
-  // What still needs to be sent to Firestore.
-  const dirty = { favorites: false, settings: false, progress: new Set() };
+  const lastRun = { save: 0, load: 0 };
+  const ui = {};
 
   // ---------- small helpers ----------
   function coded(code, message) {
@@ -119,6 +105,29 @@
       if (isValidProgress(raw[id])) out[id] = raw[id];
     });
     return out;
+  }
+
+  // Only known keys with primitive values are ever synced (matches the
+  // Firestore rule that caps settings at 10 keys).
+  function sanitizeSettings(raw) {
+    if (!isPlainObject(raw)) return null;
+    const out = {};
+    SETTING_KEYS.forEach((k) => {
+      const v = raw[k];
+      if (typeof v === "string" || Number.isFinite(v)) out[k] = v;
+    });
+    return Object.keys(out).length ? out : null;
+  }
+
+  function formatTime(ts) {
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(ts));
+    } catch {
+      return new Date(ts).toLocaleString();
+    }
   }
 
   // ---------- SDK + app ----------
@@ -173,10 +182,19 @@
 
   function showGateError() {
     reveal();
-    document.body.innerHTML =
-      "<div style=\"max-width:420px;margin:20vh auto;padding:0 1.25rem;font:0.9rem/1.6 'Space Mono',monospace;color:#ece4d1;text-align:center\">" +
-      "The sign-in service couldn't be reached. Check your connection and try again.<br><br>" +
-      '<button onclick="location.reload()" style="font:inherit;letter-spacing:.05em;text-transform:uppercase;background:transparent;color:#d4ac57;border:1px solid #b8923f;padding:.5rem .9rem;cursor:pointer">Retry</button></div>';
+    const box = document.createElement("div");
+    box.className = "gate-error";
+    box.setAttribute("role", "alert");
+    const msg = document.createElement("p");
+    msg.textContent =
+      "The sign-in service couldn't be reached. Check your connection and try again.";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "opt-btn";
+    btn.textContent = "Retry";
+    btn.addEventListener("click", () => location.reload());
+    box.append(msg, btn);
+    document.body.replaceChildren(box);
   }
 
   function redirectToSetup() {
@@ -224,7 +242,6 @@
         if (!name) return redirectToSetup(); // every account needs a username
         renderAccount(user, name);
         reveal();
-        await sync(user.uid); // never throws; `ready` resolves once local + remote agree
       } else if (MODE === "setup") {
         let name;
         try {
@@ -246,22 +263,6 @@
     }
   }
 
-  function renderAccount(user, name) {
-    const label = document.getElementById("accountEmail");
-    if (label)
-      label.textContent = name
-        ? "Signed in as @" + name
-        : "Signed in as " + (user.email || "reader");
-    const btn = document.getElementById("signOutBtn");
-    if (btn && !btn.dataset.bound) {
-      btn.dataset.bound = "1";
-      btn.addEventListener("click", () => {
-        btn.disabled = true;
-        signOut().catch(() => (btn.disabled = false));
-      });
-    }
-  }
-
   // ---------- local storage ----------
   function readLocal() {
     let favorites = {},
@@ -273,8 +274,9 @@
       );
     } catch {}
     try {
-      const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
-      settings = isPlainObject(s) ? s : null;
+      settings = sanitizeSettings(
+        JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null"),
+      );
     } catch {}
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -321,9 +323,6 @@
       if (k && k.indexOf(PROGRESS_PREFIX) === 0) doomed.push(k);
     }
     doomed.forEach((k) => localStorage.removeItem(k));
-    dirty.favorites = false;
-    dirty.settings = false;
-    dirty.progress.clear();
   }
 
   // If a different reader signs in on this browser, don't let the
@@ -331,12 +330,14 @@
   function claimLocal(uid) {
     const prev = localStorage.getItem(UID_KEY);
     if (prev && prev !== uid) clearLocal();
-    localStorage.setItem(UID_KEY, uid);
+    try {
+      localStorage.setItem(UID_KEY, uid);
+    } catch {}
   }
 
   function readMeta() {
     try {
-      return JSON.parse(localStorage.getItem(META_KEY) || "{}");
+      return JSON.parse(localStorage.getItem(META_KEY) || "{}") || {};
     } catch {
       return {};
     }
@@ -350,18 +351,37 @@
     } catch {}
   }
 
+  function hasLocalData() {
+    const l = readLocal();
+    return (
+      Object.keys(l.favorites).length > 0 ||
+      Object.keys(l.progress).length > 0 ||
+      !!l.settings
+    );
+  }
+
+  // True when this device has changes the cloud copy may not have.
+  // Also true for pre-existing local data that has never been synced.
+  function hasUnsynced() {
+    const m = readMeta();
+    if (m.unsynced === true) return true;
+    return !m.lastSyncAt && hasLocalData();
+  }
+
   // ---------- merge rules ----------
   // Whole-value, last-writer-wins (favorites, settings).
   // `localWon` means local is genuinely newer and must be uploaded.
   function mergeWhole(local, remote, localTs, remoteTs) {
     localTs = localTs || 0;
     remoteTs = remoteTs || 0;
-    if (remote == null)
+    if (remote == null) {
+      const hasContent = isPlainObject(local) && Object.keys(local).length > 0;
       return {
         value: local,
         ts: localTs,
-        localWon: local != null && localTs > 0,
+        localWon: local != null && (localTs > 0 || hasContent),
       };
+    }
     if (local == null) return { value: remote, ts: remoteTs, localWon: false };
     if (remoteTs > localTs)
       return { value: remote, ts: remoteTs, localWon: false };
@@ -383,192 +403,342 @@
     return { merged, localWins };
   }
 
-  const docRef = (uid) => db.collection("users").doc(uid);
-
-  function reconcile(remoteRaw) {
+  function planMerge(remoteRaw) {
     const local = readLocal();
     const meta = readMeta();
-
     const remoteFavorites =
       remoteRaw.favorites == null
         ? null
         : sanitizeFavorites(remoteRaw.favorites);
-    const remoteSettings = isPlainObject(remoteRaw.settings)
-      ? remoteRaw.settings
-      : null;
-    const remoteProgress = sanitizeProgress(remoteRaw.progress);
 
-    const fav = mergeWhole(
-      local.favorites,
-      remoteFavorites,
-      meta.favoritesUpdatedAt,
-      remoteRaw.favoritesUpdatedAt,
-    );
-    const sett = mergeWhole(
-      local.settings,
-      remoteSettings,
-      meta.settingsUpdatedAt,
-      remoteRaw.settingsUpdatedAt,
-    );
-    const prog = mergeProgress(local.progress, remoteProgress);
+    return {
+      fav: mergeWhole(
+        local.favorites,
+        remoteFavorites,
+        meta.favoritesUpdatedAt,
+        remoteRaw.favoritesUpdatedAt,
+      ),
+      sett: mergeWhole(
+        local.settings,
+        sanitizeSettings(remoteRaw.settings),
+        meta.settingsUpdatedAt,
+        remoteRaw.settingsUpdatedAt,
+      ),
+      prog: mergeProgress(local.progress, sanitizeProgress(remoteRaw.progress)),
+    };
+  }
 
+  function applyLocal(plan) {
     writeLocal({
-      favorites: fav.value,
-      settings: sett.value,
-      progress: prog.merged,
+      favorites: plan.fav.value,
+      settings: plan.sett.value,
+      progress: plan.prog.merged,
     });
-    setMeta({ favoritesUpdatedAt: fav.ts, settingsUpdatedAt: sett.ts });
-
-    // Anything local is newer on gets queued; everything else stays untouched.
-    if (fav.localWon) dirty.favorites = true;
-    if (sett.localWon) dirty.settings = true;
-    prog.localWins.forEach((id) => dirty.progress.add(id));
+    setMeta({
+      favoritesUpdatedAt: plan.fav.ts,
+      settingsUpdatedAt: plan.sett.ts,
+    });
   }
 
-  // ---------- pull ----------
-  async function sync(uid, { force = false } = {}) {
-    if (syncInFlight) return syncInFlight;
-    if (
-      !force &&
-      Date.now() - (readMeta().lastPullAt || 0) < PULL_MIN_INTERVAL_MS
-    )
-      return;
+  const docRef = (uid) => db.collection("users").doc(uid);
 
-    syncInFlight = (async () => {
-      try {
-        const snap = await withTimeout(docRef(uid).get(), NETWORK_TIMEOUT_MS);
-        reconcile(snap.exists ? snap.data() || {} : {});
-        setMeta({ lastPullAt: Date.now() });
-      } catch (err) {
-        console.warn("Sync: pull failed:", err);
-      } finally {
-        syncInFlight = null;
-        if (hasPending()) schedulePush(PUSH_DELAY_FAST_MS);
-      }
-    })();
-    return syncInFlight;
+  async function fetchRemote(uid) {
+    const snap = await withTimeout(docRef(uid).get(), NETWORK_TIMEOUT_MS);
+    return { exists: snap.exists, data: snap.exists ? snap.data() || {} : {} };
   }
 
-  // ---------- push ----------
-  function hasPending() {
-    return dirty.favorites || dirty.settings || dirty.progress.size > 0;
-  }
-
-  // Keeps the *earliest* requested time, so a steady stream of progress
-  // events results in a throttle (one write per window), not a debounce
-  // that never fires until the reader stops.
-  function schedulePush(delayMs) {
-    if (!auth || !auth.currentUser) return;
-    const due = Date.now() + delayMs;
-    if (pushTimer && due >= pushDueAt) return;
-    clearTimeout(pushTimer);
-    pushDueAt = due;
-    pushTimer = setTimeout(pushNow, delayMs);
-  }
-
-  async function pushNow() {
-    clearTimeout(pushTimer);
-    pushTimer = null;
-    pushDueAt = 0;
-
-    const user = auth && auth.currentUser;
-    if (!user || !hasPending()) return;
-
-    const local = readLocal();
-    const meta = readMeta();
-    const { FieldPath } = firebase.firestore;
+  // ---------- manual sync operations ----------
+  async function saveToCloud(user) {
+    const remote = await fetchRemote(user.uid); // 1 read
+    const plan = planMerge(remote.data);
+    applyLocal(plan);
 
     const data = {};
     const fields = [];
-    const sent = {
-      favorites: dirty.favorites,
-      settings: dirty.settings && !!local.settings,
-      progress: Array.from(dirty.progress),
-    };
+    const { FieldPath } = firebase.firestore;
 
     // mergeFields with a top-level name REPLACES that whole map, so removed
-    // favorites really disappear (a plain set(..., {merge:true}) would keep them).
-    if (sent.favorites) {
-      data.favorites = local.favorites;
-      data.favoritesUpdatedAt = meta.favoritesUpdatedAt || Date.now();
+    // favorites really disappear.
+    if (plan.fav.localWon) {
+      const ts = plan.fav.ts || Date.now();
+      data.favorites = plan.fav.value;
+      data.favoritesUpdatedAt = ts;
       fields.push("favorites", "favoritesUpdatedAt");
+      setMeta({ favoritesUpdatedAt: ts });
     }
-    if (sent.settings) {
-      data.settings = local.settings;
-      data.settingsUpdatedAt = meta.settingsUpdatedAt || Date.now();
+    if (plan.sett.localWon && plan.sett.value) {
+      const ts = plan.sett.ts || Date.now();
+      data.settings = plan.sett.value;
+      data.settingsUpdatedAt = ts;
       fields.push("settings", "settingsUpdatedAt");
+      setMeta({ settingsUpdatedAt: ts });
     }
-    const progress = {};
-    sent.progress.forEach((id) => {
-      if (!isValidProgress(local.progress[id])) return;
-      progress[id] = local.progress[id];
-      fields.push(new FieldPath("progress", id)); // touch only this book
-    });
-    if (Object.keys(progress).length) data.progress = progress;
+    if (plan.prog.localWins.length) {
+      data.progress = {};
+      plan.prog.localWins.forEach((id) => {
+        data.progress[id] = plan.prog.merged[id];
+        fields.push(new FieldPath("progress", id)); // touch only this book
+      });
+    }
 
-    dirty.favorites = false;
-    dirty.settings = false;
-    dirty.progress.clear();
-    if (!fields.length) return;
-
-    try {
+    if (fields.length) {
       await withTimeout(
-        docRef(user.uid).set(data, { mergeFields: fields }),
+        docRef(user.uid).set(data, { mergeFields: fields }), // 1 write
         NETWORK_TIMEOUT_MS,
       );
-    } catch (err) {
-      console.warn("Sync: push failed:", err);
-      // Only re-queue failures that can succeed later; a permission or
-      // validation error would otherwise retry forever and burn quota.
-      if (RETRYABLE_CODES.has(err.code)) {
-        dirty.favorites = dirty.favorites || sent.favorites;
-        dirty.settings = dirty.settings || sent.settings;
-        sent.progress.forEach((id) => dirty.progress.add(id));
-        schedulePush(PUSH_RETRY_MS);
-      }
+    }
+    setMeta({ unsynced: false, lastSyncAt: Date.now() });
+    return {
+      message: fields.length
+        ? "Saved to the cloud."
+        : "The cloud already has your latest data.",
+    };
+  }
+
+  async function loadFromCloud(user) {
+    const remote = await fetchRemote(user.uid); // 1 read, no write
+    if (
+      !remote.exists ||
+      !Object.keys(remote.data).some((k) => k !== "username")
+    ) {
+      return {
+        message: "Nothing saved in the cloud yet. Use “Save to cloud” first.",
+      };
+    }
+    const plan = planMerge(remote.data);
+    applyLocal(plan);
+    const localOnly =
+      plan.fav.localWon || plan.sett.localWon || plan.prog.localWins.length > 0;
+    setMeta({ lastSyncAt: Date.now(), unsynced: localOnly });
+    return {
+      message: localOnly
+        ? "Loaded. Some newer changes on this device are still unsaved."
+        : "Loaded from the cloud.",
+    };
+  }
+
+  function errorMessage(err) {
+    if (err && err.code === "permission-denied")
+      return "The cloud refused the request. Sign out, sign back in, and try again.";
+    if (
+      err &&
+      (err.code === "sync/timeout" ||
+        err.code === "unavailable" ||
+        err.code === "deadline-exceeded")
+    )
+      return "Couldn't reach the cloud. Check your connection and try again.";
+    return "Something went wrong. Please try again.";
+  }
+
+  // ---------- sync UI ----------
+  function setStatus(text, state) {
+    if (!ui.status) return;
+    ui.status.textContent = text;
+    ui.status.dataset.state = state || "";
+  }
+
+  function markDirtyButton() {
+    if (ui.save) ui.save.dataset.dirty = String(hasUnsynced());
+  }
+
+  function renderIdleStatus() {
+    markDirtyButton();
+    const m = readMeta();
+    if (hasUnsynced()) {
+      setStatus("Unsaved changes on this device.", "dirty");
+    } else if (m.lastSyncAt) {
+      setStatus("Synced " + formatTime(m.lastSyncAt) + ".", "good");
+    } else {
+      setStatus(
+        "Not synced yet. Tap “Load from cloud” to fetch your saved data.",
+        "",
+      );
     }
   }
 
-  if (MODE === "required") {
-    window.addEventListener("3nding:favorites-changed", () => {
-      setMeta({ favoritesUpdatedAt: Date.now() });
-      dirty.favorites = true;
-      schedulePush(PUSH_DELAY_FAST_MS);
-    });
-    window.addEventListener("3nding:settings-changed", () => {
-      setMeta({ settingsUpdatedAt: Date.now() });
-      dirty.settings = true;
-      schedulePush(PUSH_DELAY_FAST_MS);
-    });
-    window.addEventListener("3nding:progress-changed", (e) => {
-      const id = e.detail && e.detail.bookId;
-      if (id == null) return;
-      dirty.progress.add(String(id));
-      schedulePush(PUSH_DELAY_PROGRESS_MS);
-    });
+  function setBusy(on, kind) {
+    busy = on;
+    [ui.save, ui.load, ui.signOut].forEach((b) => b && (b.disabled = on));
+    if (ui.save)
+      ui.save.textContent = on && kind === "save" ? "Saving…" : "Save to cloud";
+    if (ui.load)
+      ui.load.textContent =
+        on && kind === "load" ? "Loading…" : "Load from cloud";
+    if (ui.status) ui.status.setAttribute("aria-busy", String(on));
+  }
 
-    // Flush before the page goes away (best effort), and refresh when the
-    // reader comes back to a tab. Both are no-ops when there is nothing to do.
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        pushNow();
-      } else if (auth && auth.currentUser) {
-        sync(auth.currentUser.uid);
-      }
+  async function runSync(kind) {
+    if (busy) return;
+    const user = auth && auth.currentUser;
+    if (!user) return;
+    if (!navigator.onLine)
+      return setStatus(
+        "You're offline. Try again once you're connected.",
+        "error",
+      );
+    if (Date.now() - lastRun[kind] < ACTION_COOLDOWN_MS)
+      return setStatus("One moment before trying that again.", "");
+    if (kind === "save" && !hasUnsynced()) {
+      lastRun.save = Date.now();
+      return setStatus("Nothing new to save.", "good");
+    }
+
+    setBusy(true, kind);
+    setStatus(kind === "save" ? "Saving…" : "Loading…", "");
+    try {
+      const result =
+        kind === "save" ? await saveToCloud(user) : await loadFromCloud(user);
+      lastRun[kind] = Date.now();
+      setStatus(result.message, "good");
+    } catch (err) {
+      console.warn("Sync: " + kind + " failed:", err);
+      setStatus(errorMessage(err), "error");
+    } finally {
+      setBusy(false);
+      markDirtyButton();
+    }
+  }
+
+  function renderAccount(user, name) {
+    ui.label = document.getElementById("accountEmail");
+    ui.save = document.getElementById("cloudSaveBtn");
+    ui.load = document.getElementById("cloudLoadBtn");
+    ui.status = document.getElementById("syncStatus");
+    ui.signOut = document.getElementById("signOutBtn");
+
+    if (ui.label)
+      ui.label.textContent = name
+        ? "Signed in as @" + name
+        : "Signed in as " + (user.email || "reader");
+
+    if (ui.signOut && !ui.signOut.dataset.bound) {
+      ui.signOut.dataset.bound = "1";
+      ui.signOut.addEventListener("click", async () => {
+        if (busy) return;
+        ui.signOut.disabled = true;
+        try {
+          await signOut();
+        } catch (err) {
+          console.warn("Sign out failed:", err);
+          setStatus(
+            err && err.userMessage
+              ? err.userMessage
+              : "Couldn't sign out. Please try again.",
+            "error",
+          );
+        } finally {
+          if (!signingOut) ui.signOut.disabled = false;
+        }
+      });
+    }
+    if (ui.save && !ui.save.dataset.bound) {
+      ui.save.dataset.bound = "1";
+      ui.save.addEventListener("click", () => runSync("save"));
+    }
+    if (ui.load && !ui.load.dataset.bound) {
+      ui.load.dataset.bound = "1";
+      ui.load.addEventListener("click", () => runSync("load"));
+    }
+    if (MODE === "required") renderIdleStatus();
+  }
+
+  // Modal choice dialog built on the native <dialog> element.
+  // Resolves with the chosen action id; Esc / backdrop close = "cancel".
+  function askChoice({ title, message, actions }) {
+    return new Promise((resolve) => {
+      const dlg = document.createElement("dialog");
+      dlg.className = "sync-dialog";
+      const titleId = "syncDialogTitle";
+      dlg.setAttribute("aria-labelledby", titleId);
+
+      const h = document.createElement("h2");
+      h.id = titleId;
+      h.textContent = title;
+      const p = document.createElement("p");
+      p.textContent = message;
+      const row = document.createElement("div");
+      row.className = "sync-dialog-actions";
+
+      let result = "cancel";
+      actions.forEach((a) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "opt-btn" + (a.primary ? " is-primary" : "");
+        b.textContent = a.label;
+        b.addEventListener("click", () => {
+          result = a.id;
+          dlg.close();
+        });
+        row.appendChild(b);
+      });
+
+      dlg.append(h, p, row);
+      dlg.addEventListener(
+        "close",
+        () => {
+          dlg.remove();
+          resolve(result);
+        },
+        { once: true },
+      );
+      document.body.appendChild(dlg);
+      dlg.showModal();
     });
-    window.addEventListener("pagehide", () => {
-      pushNow();
+  }
+
+  // ---------- change tracking (local only, zero network) ----------
+  function markUnsynced(patch) {
+    const m = readMeta();
+    if (m.unsynced === true && !patch) return;
+    setMeta(Object.assign({ unsynced: true }, patch));
+    if (!busy) renderIdleStatus();
+  }
+
+  if (MODE === "required") {
+    window.addEventListener("3nding:favorites-changed", () =>
+      markUnsynced({ favoritesUpdatedAt: Date.now() }),
+    );
+    window.addEventListener("3nding:settings-changed", () =>
+      markUnsynced({ settingsUpdatedAt: Date.now() }),
+    );
+    window.addEventListener("3nding:progress-changed", () => markUnsynced());
+    // Keep the indicator right when another tab changes something.
+    window.addEventListener("storage", (e) => {
+      if (e.key === META_KEY && !busy) renderIdleStatus();
     });
   }
 
   // ---------- public API ----------
   async function signOut() {
+    if (MODE === "required" && hasUnsynced()) {
+      const choice = await askChoice({
+        title: "Unsaved changes",
+        message:
+          "Signing out clears this device's saved data. Changes that aren't saved to the cloud will be lost.",
+        actions: [
+          { id: "save", label: "Save & sign out", primary: true },
+          { id: "discard", label: "Sign out anyway" },
+          { id: "cancel", label: "Cancel" },
+        ],
+      });
+      if (choice === "cancel") return false;
+      if (choice === "save") {
+        try {
+          await saveToCloud(auth.currentUser);
+        } catch (err) {
+          console.warn("Sync: save before sign-out failed:", err);
+          const e = new Error("save failed");
+          e.userMessage = errorMessage(err) + " You have not been signed out.";
+          throw e;
+        }
+      }
+    }
     signingOut = true;
     try {
-      await pushNow(); // has its own timeout, so signing out offline can't hang
       await auth.signOut();
       clearLocal(); // UID_KEY is kept on purpose; see claimLocal()
       location.replace(LOGIN);
+      return true;
     } catch (err) {
       signingOut = false;
       throw err;

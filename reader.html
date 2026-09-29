@@ -123,17 +123,24 @@
 
       <button class="reset-btn" id="resetBtn">Reset to defaults</button>
 
-      <div class="setting-group sync-row" id="accountRow">
+      <div class="sync-row" id="accountRow">
         <span class="setting-label">Account</span>
         <p class="sync-status" id="accountEmail">Signed in</p>
-        <button
-          type="button"
-          class="opt-btn"
-          id="signOutBtn"
-          style="width: 100%"
-        >
-          Sign out
-        </button>
+        <div class="sync-actions">
+          <button type="button" class="opt-btn" id="cloudSaveBtn">
+            Save to cloud
+          </button>
+          <button type="button" class="opt-btn" id="cloudLoadBtn">
+            Load from cloud
+          </button>
+        </div>
+        <p
+          class="sync-note"
+          id="syncStatus"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <button type="button" class="opt-btn" id="signOutBtn">Sign out</button>
       </div>
 
       <a href="pages/support.html" class="drawer-support-link"

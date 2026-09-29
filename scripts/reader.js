@@ -13,7 +13,6 @@
     SIZE_MAX = 26,
     SIZE_STEP = 1;
 
-  const SYNC_WAIT_MS = 4000; // don't block reading if offline
   const MIN_SAVE_DELTA = 0.02; // ignore scroll changes under 2%
   let lastSaved = null;
 
@@ -182,14 +181,6 @@
   // ---------- progress persistence ----------
   function progressKey(id) {
     return "3nding:progress:" + id;
-  }
-
-  function waitForSync() {
-    const cloud = window.Auth ? window.Auth.ready : Promise.resolve();
-    return Promise.race([
-      cloud,
-      new Promise((r) => setTimeout(r, SYNC_WAIT_MS)),
-    ]);
   }
 
   function loadProgress(id) {
@@ -405,15 +396,13 @@
 
       applySettings();
 
-      const syncReady = waitForSync();
       const saved = loadProgress(bookId);
+      lastSaved = saved; // baseline, so merely opening a book doesn't bump updatedAt
       const startIndex = saved ? saved.chapterIndex : 0;
       await loadChapter(startIndex, true);
-      await syncReady;
-      lastSaved = loadProgress(bookId);
 
       window.addEventListener("scroll", onScroll, { passive: true });
-     window.addEventListener("pagehide", () => persistProgress(0.001));
+      window.addEventListener("pagehide", () => persistProgress(0.001));
     } catch (err) {
       renderError(`Something went wrong (${err.message}).`);
     }
