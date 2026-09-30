@@ -342,7 +342,7 @@
     } catch (err) {
       grid.innerHTML = `
         <div class="error-box">
-          The archive couldn't be reached (${err.message}).<br>
+          The archive couldn't be reached (${escapeHtml(err.message)}).<br>
           Make sure <code>books.json</code> sits next to this page.
           <div><button id="retry">Try again</button></div>
         </div>`;

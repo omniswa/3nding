@@ -1,5 +1,5 @@
 (function () {
-  ("use strict");
+  "use strict";
 
   const script = document.currentScript;
   const MODE = (script && script.dataset.auth) || "required";
@@ -29,9 +29,10 @@
   const UNAME_MAX = 14;
   const SETTING_KEYS = ["font", "size", "align", "theme"];
 
-  const NETWORK_TIMEOUT_MS = 8000; 
-  const ACTION_COOLDOWN_MS = 5000; 
+  const NETWORK_TIMEOUT_MS = 8000;
+  const ACTION_COOLDOWN_MS = 5000;
 
+  let bootRemote = null;
   let sdkPromise = null;
   let auth = null;
   let db = null;
@@ -92,13 +93,18 @@
     return out;
   }
 
+  const ENUMS = {
+    font: ["serif", "sans", "mono"],
+    align: ["left", "justify"],
+    theme: ["paper", "sepia", "dark"],
+  };
   function sanitizeSettings(raw) {
     if (!isPlainObject(raw)) return null;
     const out = {};
-    SETTING_KEYS.forEach((k) => {
-      const v = raw[k];
-      if (typeof v === "string" || Number.isFinite(v)) out[k] = v;
-    });
+    for (const [k, list] of Object.entries(ENUMS))
+      if (list.includes(raw[k])) out[k] = raw[k];
+    if (Number.isFinite(raw.size))
+      out.size = Math.min(26, Math.max(14, Math.round(raw.size)));
     return Object.keys(out).length ? out : null;
   }
 
@@ -129,7 +135,7 @@
     sdkPromise = loadScript(SDK_CORE)
       .then(() => Promise.all(SDK_SERVICES.map(loadScript)))
       .catch((err) => {
-        sdkPromise = null; 
+        sdkPromise = null;
         throw err;
       });
     return sdkPromise;
@@ -492,14 +498,14 @@
   async function saveToCloud(user) {
     const seq = changeSeq;
     const ref = docRef(user.uid);
-    let plan = null;
+    let remoteData = {};
     let upload = null;
 
     await withTimeout(
       db.runTransaction(async (tx) => {
         const snap = await tx.get(ref);
-        plan = planMerge(snap.exists ? snap.data() || {} : {});
-        upload = buildUpload(plan);
+        remoteData = snap.exists ? snap.data() || {} : {};
+        upload = buildUpload(planMerge(remoteData));
         if (upload.fields.length) {
           tx.set(ref, upload.data, { mergeFields: upload.fields });
         }
@@ -507,7 +513,8 @@
       NETWORK_TIMEOUT_MS,
     );
 
-    applyLocal(plan);
+    // Re-merge against *current* local state so edits made during the await survive.
+    applyLocal(planMerge(remoteAfterUpload(remoteData, upload.data)));
     if (upload.settingsTs) setMeta({ settingsUpdatedAt: upload.settingsTs });
     setMeta({ unsynced: changeSeq !== seq, lastSyncAt: Date.now() });
     return {
@@ -515,6 +522,18 @@
         ? "Saved to the cloud."
         : "The cloud already has your latest data.",
     };
+  }
+
+  function remoteAfterUpload(remote, data) {
+    const next = { ...remote };
+    ["favorites", "favoritesRemoved", "settings", "settingsUpdatedAt"].forEach(
+      (k) => {
+        if (k in data) next[k] = data[k];
+      },
+    );
+    if (data.progress)
+      next.progress = { ...(remote.progress || {}), ...data.progress };
+    return next;
   }
 
   async function loadFromCloud(user) {
@@ -714,7 +733,7 @@
 
   // ---------- change tracking (local only, zero network) ----------
   function markUnsynced(patch) {
-    if (signingOut) return; 
+    if (signingOut) return;
     changeSeq++;
     const m = readMeta();
     if (m.unsynced === true && !patch) return;
