@@ -32,7 +32,7 @@
     "auth/too-many-requests": "Too many attempts. Wait and try again.",
     "auth/network-request-failed": "Network problem. Check your connection.",
     "auth/user-disabled": "This account has been disabled.",
-    "auth/popup-blocked": "Sign-in is pop-up blocked the. Allow pop-ups.",
+    "auth/popup-blocked": "Sign-in pop-up is blocked. Allow pop-ups.",
     "auth/operation-not-allowed": "This sign-in method isn't enabled yet.",
     "auth/unauthorized-domain": "This domain isn't authorized for sign-in yet.",
     "username/invalid": "That username isn't valid.",
