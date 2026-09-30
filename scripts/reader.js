@@ -234,6 +234,7 @@
     const next = {
       chapterIndex,
       scrollFraction: scrollFraction(),
+      percent: Math.round(overallPercent() * 10) / 10,
       updatedAt: Date.now(),
     };
     const base = lastSaved || { chapterIndex: 0, scrollFraction: 0 };

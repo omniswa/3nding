@@ -16,7 +16,12 @@
   const drawer = document.getElementById("drawer");
   const drawerBackdrop = document.getElementById("drawerBackdrop");
   const drawerCloseBtn = document.getElementById("drawerCloseBtn");
+  const continueShelf = document.getElementById("continueShelf");
+  const continueList = document.getElementById("continueList");
 
+  const PROGRESS_PREFIX = "3nding:progress:";
+  const SHELF_MAX = 3;
+  const FINISHED_PERCENT = 98;
   const SKELETON_COUNT = 10;
   const MIN_LOADING_MS = 450;
   const PAGE_SIZE = 12;
@@ -121,6 +126,74 @@
     }
   }
 
+  // ---------- "Continue reading" shelf ----------
+  function readAllProgress() {
+    const out = new Map();
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(PROGRESS_PREFIX)) continue;
+        try {
+          const p = JSON.parse(localStorage.getItem(key));
+          if (
+            p &&
+            Number.isInteger(p.chapterIndex) &&
+            p.chapterIndex >= 0 &&
+            Number.isFinite(p.updatedAt)
+          ) {
+            out.set(key.slice(PROGRESS_PREFIX.length), p);
+          }
+        } catch {
+          // Skip a corrupt entry; the rest of the shelf still renders.
+        }
+      }
+    } catch {
+      // Storage unavailable (e.g. private mode): the shelf simply stays hidden.
+    }
+    return out;
+  }
+
+  function getContinueEntries() {
+    const progress = readAllProgress();
+    return allBooks
+      .filter((book) => progress.has(String(book.id)))
+      .map((book) => ({ book, p: progress.get(String(book.id)) }))
+      .filter(
+        ({ p }) =>
+          !(typeof p.percent === "number" && p.percent >= FINISHED_PERCENT),
+      )
+      .sort((a, b) => b.p.updatedAt - a.p.updatedAt)
+      .slice(0, SHELF_MAX);
+  }
+
+  function renderShelf() {
+    const visible =
+      allBooks.length > 0 && !favoritesOnly && !searchInput.value.trim();
+    const entries = visible ? getContinueEntries() : [];
+
+    continueList.replaceChildren();
+    continueShelf.hidden = entries.length === 0;
+
+    entries.forEach(({ book, p }) => {
+      const pct =
+        typeof p.percent === "number"
+          ? Math.min(100, Math.max(0, Math.round(p.percent)))
+          : null;
+      const item = document.createElement("li");
+      item.className = "continue-item";
+      item.innerHTML = `
+      <img class="continue-cover" src="${escapeHtml(book.cover)}" alt="" width="48" height="64" loading="lazy">
+      <div class="continue-body">
+        <a class="continue-link" href="reader.html?id=${encodeURIComponent(book.id)}">${escapeHtml(book.title)}</a>
+        <span class="continue-meta">Chapter ${p.chapterIndex + 1}${pct !== null ? ` · ${pct}% read` : ""}</span>
+        ${pct !== null ? '<span class="continue-bar" aria-hidden="true"><span class="continue-fill"></span></span>' : ""}
+      </div>`;
+      const fill = item.querySelector(".continue-fill");
+      if (fill) fill.style.width = pct + "%";
+      continueList.appendChild(item);
+    });
+  }
+
   // ---------- drawer (mobile) ----------
   function openDrawer() {
     drawer.classList.add("open");
@@ -205,8 +278,8 @@
 
   function scrollToGrid() {
     const top = grid.getBoundingClientRect().top + window.scrollY - 90;
-      const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-      window.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
+    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
   }
 
   prevPageBtn.addEventListener("click", () => {
@@ -236,6 +309,7 @@
 
   function applyFilter(resetPage) {
     if (resetPage) currentPage = 1;
+    renderShelf();
     const q = searchInput.value.trim().toLowerCase();
 
     let matches = allBooks;
@@ -305,6 +379,13 @@
     removed = loadRemoved();
     updateFavCount();
     if (allBooks.length) applyFilter(false);
+  });
+
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) renderShelf();
+  });
+  window.addEventListener("storage", (e) => {
+    if (e.key && e.key.startsWith(PROGRESS_PREFIX)) renderShelf();
   });
 
   async function loadBooks() {
