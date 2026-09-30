@@ -221,5 +221,13 @@
     <script src="scripts/firebase-config.js" defer></script>
     <script src="scripts/auth.js" data-auth="optional" defer></script>
     <script src="scripts/index.js" defer></script>
+
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js");
+        });
+      }
+    </script>
   </body>
 </html>
