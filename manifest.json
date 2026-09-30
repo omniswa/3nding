@@ -1,7 +1,10 @@
 {
+  "id": "/",
   "name": "3NDING",
   "short_name": "3NDING",
+  "description": "A free online book archive.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#171b21",
   "theme_color": "#171b21",
