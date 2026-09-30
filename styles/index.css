@@ -370,6 +370,10 @@ main {
   outline-offset: 2px;
 }
 
+.opt-btn[hidden] {
+  display: none;
+}
+
 .fav-count {
   margin-left: auto;
   font-family: "Space Mono", monospace;

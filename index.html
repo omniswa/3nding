@@ -3,24 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <!-- Auth gate: hide the page until sign-in state is known (see scripts/auth.js) -->
-    <script>
-      document.documentElement.classList.add("auth-pending");
-    </script>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#171b21" />
-    <style>
-      html.auth-pending body {
-        visibility: hidden;
-      }
-    </style>
+
+    <script src="scripts/auth.js" data-auth="optional" defer></script>
 
     <!-- Primary SEO -->
     <title>3NDING — Free Online Book Archive | Read Stories & Novels</title>
     <meta
       name="description"
-      content="Browse and read a growing archive of free books online — novels, letters, field notes and more. Create a free account to search, save favorites, and start reading."
+      content="Browse and read a growing archive of free books online — novels, letters, field notes and more."
     />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://3nding.top" />

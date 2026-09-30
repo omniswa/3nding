@@ -302,6 +302,10 @@ body.theme-dark {
   font-weight: 600;
 }
 
+.opt-btn[hidden] {
+  display: none;
+}
+
 .size-row {
   display: flex;
   align-items: center;

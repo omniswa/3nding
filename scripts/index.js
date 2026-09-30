@@ -19,7 +19,7 @@
 
   const SKELETON_COUNT = 10;
   const MIN_LOADING_MS = 450; 
-  const PAGE_SIZE = 10; 
+  const PAGE_SIZE = 12; 
   const FAVORITES_KEY = "3nding:favorites";
   const REMOVED_KEY = "3nding:favorites-removed";
 

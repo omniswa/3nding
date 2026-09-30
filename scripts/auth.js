@@ -27,18 +27,20 @@
   const TOMBSTONE_TTL_MS = 180 * 24 * 60 * 60 * 1000;
   const UNAME_MIN = 6;
   const UNAME_MAX = 14;
-  const SETTING_KEYS = ["font", "size", "align", "theme"];
 
   const NETWORK_TIMEOUT_MS = 8000;
   const ACTION_COOLDOWN_MS = 5000;
+  const SAVE_MIN_GAP_MS = 30 * 1000;
+  const LOAD_MIN_GAP_MS = 5 * 60 * 1000;
 
-  let bootRemote = null;
   let sdkPromise = null;
   let auth = null;
   let db = null;
   let signingOut = false;
   let firstEvent = true;
   let busy = false;
+  let currentUser;
+  let refreshTimer = null;
   let changeSeq = 0;
   let resolveReady;
   const ready = new Promise((r) => (resolveReady = r));
@@ -191,16 +193,32 @@
     location.replace(u.href);
   }
 
-  async function usernameFor(user) {
+  function cachedName(uid) {
     try {
       const c = JSON.parse(localStorage.getItem(UNAME_KEY) || "null");
-      if (c && c.uid === user.uid && c.name) return c.name;
-    } catch {}
-    const snap = await withTimeout(
-      db.collection("users").doc(user.uid).get(),
-      NETWORK_TIMEOUT_MS,
-    );
-    const name = (snap.exists && snap.data().username) || "";
+      return c && c.uid === uid && c.name ? c.name : "";
+    } catch {
+      return "";
+    }
+  }
+
+  const hasCloudData = (d) => Object.keys(d).some((k) => k !== "username");
+  const hasLocalOnly = (plan) =>
+    plan.fav.needsUpload ||
+    plan.sett.localWon ||
+    plan.prog.localWins.length > 0;
+
+  // Runs once per account per device: one read gives username + saved data.
+  async function bootstrapUser(user, isNew) {
+    const cached = cachedName(user.uid);
+    const m = readMeta();
+    if (cached && (m.pulledUid === user.uid || m.lastSyncAt)) return cached;
+    if (isNew) {
+      setMeta({ pulledUid: user.uid });
+      return cached;
+    }
+    const remote = await fetchRemote(user.uid);
+    const name = remote.data.username || "";
     if (name) {
       try {
         localStorage.setItem(
@@ -209,37 +227,46 @@
         );
       } catch {}
     }
+    if (hasCloudData(remote.data)) {
+      const plan = planMerge(remote.data);
+      applyLocal(plan);
+      setMeta({
+        pulledUid: user.uid,
+        lastSyncAt: Date.now(),
+        lastCheckAt: Date.now(),
+        unsynced: hasLocalOnly(plan),
+      });
+    } else {
+      setMeta({ pulledUid: user.uid, lastCheckAt: Date.now() });
+    }
     return name;
   }
 
   async function onAuthState(user) {
-    if (user) {
-      if (MODE === "required") {
-        claimLocal(user.uid);
-        let name;
-        try {
-          name = await usernameFor(user);
-        } catch (err) {
-          console.warn("Auth: couldn't read username:", err);
-          return showGateError();
-        }
-        if (!name) return redirectToSetup();
-        renderAccount(user, name);
-        reveal();
-      } else if (MODE === "setup") {
-        let name;
-        try {
-          name = await usernameFor(user);
-        } catch (err) {
-          console.warn("Auth: couldn't read username:", err);
-          return showGateError();
-        }
+    currentUser = user || null;
+    if (user && MODE !== "guest") {
+      claimLocal(user.uid);
+      let name = "";
+      let known = true;
+      try {
+        name = await bootstrapUser(user, false);
+      } catch (err) {
+        console.warn("Auth: couldn't reach the cloud:", err);
+        if (MODE === "setup") return showGateError();
+        known = false;
+        name = cachedName(user.uid);
+      }
+      if (MODE === "setup") {
         if (name) return location.replace(nextUrl());
         renderAccount(user, "");
         reveal();
+      } else {
+        if (known && !name) return redirectToSetup();
+        renderAccount(user, name);
       }
-    } else if (MODE !== "guest" && !signingOut) {
-      redirectToLogin(MODE === "required");
+    } else if (!user) {
+      if (MODE === "setup" && !signingOut) redirectToLogin(false);
+      if (MODE === "optional") renderGuest();
     }
     if (firstEvent) {
       firstEvent = false;
@@ -303,6 +330,7 @@
         new CustomEvent("3nding:cloud-updated", { detail: data }),
       );
     }
+    return changed;
   }
 
   function clearLocal() {
@@ -312,6 +340,7 @@
       SETTINGS_KEY,
       META_KEY,
       UNAME_KEY,
+      UID_KEY,
     ];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -451,13 +480,14 @@
   }
 
   function applyLocal(plan) {
-    writeLocal({
+    const changed = writeLocal({
       favorites: plan.fav.value,
       favoritesRemoved: plan.fav.removed,
       settings: plan.sett.value,
       progress: plan.prog.merged,
     });
     setMeta({ settingsUpdatedAt: plan.sett.ts });
+    return changed;
   }
 
   function buildUpload(plan) {
@@ -516,7 +546,13 @@
     // Re-merge against *current* local state so edits made during the await survive.
     applyLocal(planMerge(remoteAfterUpload(remoteData, upload.data)));
     if (upload.settingsTs) setMeta({ settingsUpdatedAt: upload.settingsTs });
-    setMeta({ unsynced: changeSeq !== seq, lastSyncAt: Date.now() });
+    const now = Date.now();
+    setMeta({
+      unsynced: changeSeq !== seq,
+      lastSyncAt: now,
+      lastSaveAt: now,
+      lastCheckAt: now,
+    });
     return {
       message: upload.fields.length
         ? "Saved to the cloud."
@@ -539,20 +575,14 @@
   async function loadFromCloud(user) {
     const seq = changeSeq;
     const remote = await fetchRemote(user.uid);
-    if (
-      !remote.exists ||
-      !Object.keys(remote.data).some((k) => k !== "username")
-    ) {
+    setMeta({ lastCheckAt: Date.now() });
+    if (!hasCloudData(remote.data))
       return {
         message: "Nothing saved in the cloud yet. Use “Save to cloud” first.",
       };
-    }
     const plan = planMerge(remote.data);
-    applyLocal(plan);
-    const localOnly =
-      plan.fav.needsUpload ||
-      plan.sett.localWon ||
-      plan.prog.localWins.length > 0;
+    const changed = applyLocal(plan);
+    const localOnly = hasLocalOnly(plan);
     setMeta({
       lastSyncAt: Date.now(),
       unsynced: localOnly || changeSeq !== seq,
@@ -560,7 +590,9 @@
     return {
       message: localOnly
         ? "Loaded. Some newer changes on this device are still unsaved."
-        : "Loaded from the cloud.",
+        : changed
+          ? "Loaded from the cloud."
+          : "Already up to date.",
     };
   }
 
@@ -584,17 +616,80 @@
     ui.status.dataset.state = state || "";
   }
 
-  function markDirtyButton() {
-    if (ui.save) ui.save.dataset.dirty = String(hasUnsynced());
+  function gate(kind) {
+    const m = readMeta();
+    const now = Date.now();
+    if (kind === "save" && !hasUnsynced())
+      return { ok: false, msg: "Nothing new to save." };
+    const wait =
+      kind === "save"
+        ? (m.lastSaveAt || 0) + SAVE_MIN_GAP_MS - now
+        : (m.lastCheckAt || 0) + LOAD_MIN_GAP_MS - now;
+    if (wait > 0) {
+      return {
+        ok: false,
+        msg:
+          kind === "save"
+            ? "Saved just now. Try again in " + Math.ceil(wait / 1000) + "s."
+            : "Cloud checked recently. Try again in " +
+              Math.ceil(wait / 60000) +
+              " min.",
+      };
+    }
+    return { ok: true };
+  }
+
+  function scheduleRefresh() {
+    clearTimeout(refreshTimer);
+    const m = readMeta();
+    const now = Date.now();
+    const waits = [
+      (m.lastSaveAt || 0) + SAVE_MIN_GAP_MS - now,
+      (m.lastCheckAt || 0) + LOAD_MIN_GAP_MS - now,
+    ].filter((w) => w > 0);
+    if (waits.length)
+      refreshTimer = setTimeout(renderIdleStatus, Math.min(...waits) + 50);
+  }
+
+  function refreshButtons() {
+    if (!ui.save || !ui.load || !ui.signOut) return;
+    const guest = currentUser === null;
+    ui.load.hidden = guest;
+    ui.signOut.hidden = guest;
+    if (guest) {
+      ui.save.textContent = "Sign in to sync";
+      ui.save.disabled = false;
+      ui.save.dataset.dirty = "false";
+      return;
+    }
+    if (busy) return;
+    const checking = currentUser === undefined;
+    ui.save.textContent = "Save to cloud";
+    ui.load.textContent = "Load from cloud";
+    ui.save.disabled = checking || !gate("save").ok;
+    ui.load.disabled = checking || !gate("load").ok;
+    ui.signOut.disabled = checking;
+    ui.save.dataset.dirty = String(hasUnsynced());
+    scheduleRefresh();
   }
 
   function renderIdleStatus() {
-    markDirtyButton();
+    refreshButtons();
+    if (currentUser === null)
+      return setStatus(
+        "Sync is optional. Your data stays on this device until you sign in.",
+        "",
+      );
+    if (currentUser === undefined) return;
     const m = readMeta();
     if (hasUnsynced()) {
-      setStatus("Unsaved changes on this device.", "dirty");
+      const g = gate("save");
+      setStatus(g.ok ? "Unsaved changes on this device." : g.msg, "dirty");
     } else if (m.lastSyncAt) {
-      setStatus("Synced " + formatTime(m.lastSyncAt) + ".", "good");
+      setStatus(
+        "Synced " + formatTime(m.lastSyncAt) + ". Nothing new to save.",
+        "good",
+      );
     } else {
       setStatus(
         "Not synced yet. Tap “Load from cloud” to fetch your saved data.",
@@ -605,19 +700,17 @@
 
   function setBusy(on, kind) {
     busy = on;
-    [ui.save, ui.load, ui.signOut].forEach((b) => b && (b.disabled = on));
-    if (ui.save)
-      ui.save.textContent = on && kind === "save" ? "Saving…" : "Save to cloud";
-    if (ui.load)
-      ui.load.textContent =
-        on && kind === "load" ? "Loading…" : "Load from cloud";
     if (ui.status) ui.status.setAttribute("aria-busy", String(on));
+    if (!on) return refreshButtons();
+    [ui.save, ui.load, ui.signOut].forEach((b) => b && (b.disabled = true));
+    ui.save.textContent = kind === "save" ? "Saving…" : "Save to cloud";
+    ui.load.textContent = kind === "load" ? "Loading…" : "Load from cloud";
   }
 
   async function runSync(kind) {
     if (busy) return;
     const user = auth && auth.currentUser;
-    if (!user) return;
+    if (!user) return currentUser === null ? redirectToLogin(true) : undefined;
     if (!navigator.onLine)
       return setStatus(
         "You're offline. Try again once you're connected.",
@@ -625,68 +718,80 @@
       );
     if (Date.now() - lastRun[kind] < ACTION_COOLDOWN_MS)
       return setStatus("One moment before trying that again.", "");
-    if (kind === "save" && !hasUnsynced()) {
-      lastRun.save = Date.now();
-      return setStatus("Nothing new to save.", "good");
-    }
+    const g = gate(kind);
+    if (!g.ok) return setStatus(g.msg, "");
 
+    lastRun[kind] = Date.now();
     setBusy(true, kind);
     setStatus(kind === "save" ? "Saving…" : "Loading…", "");
     try {
       const result =
         kind === "save" ? await saveToCloud(user) : await loadFromCloud(user);
-      lastRun[kind] = Date.now();
       setStatus(result.message, "good");
     } catch (err) {
       console.warn("Sync: " + kind + " failed:", err);
       setStatus(errorMessage(err), "error");
     } finally {
       setBusy(false);
-      markDirtyButton();
     }
   }
 
-  function renderAccount(user, name) {
-    ui.label = document.getElementById("accountEmail");
-    ui.save = document.getElementById("cloudSaveBtn");
-    ui.load = document.getElementById("cloudLoadBtn");
-    ui.status = document.getElementById("syncStatus");
-    ui.signOut = document.getElementById("signOutBtn");
+  async function onSignOut() {
+    if (busy || !ui.signOut) return;
+    ui.signOut.disabled = true;
+    try {
+      await signOut();
+    } catch (err) {
+      console.warn("Sign out failed:", err);
+      setStatus(
+        err && err.userMessage
+          ? err.userMessage
+          : "Couldn't sign out. Please try again.",
+        "error",
+      );
+    } finally {
+      if (!signingOut) ui.signOut.disabled = false;
+    }
+  }
 
+  function initUi() {
+    const $ = (id) => document.getElementById(id);
+    ui.label = $("accountEmail");
+    ui.save = $("cloudSaveBtn");
+    ui.load = $("cloudLoadBtn");
+    ui.status = $("syncStatus");
+    ui.signOut = $("signOutBtn");
+    if (ui.label && MODE === "optional")
+      ui.label.textContent = "Checking account…";
+    if (ui.save) ui.save.addEventListener("click", () => runSync("save"));
+    if (ui.load) ui.load.addEventListener("click", () => runSync("load"));
+    if (ui.signOut) ui.signOut.addEventListener("click", onSignOut);
+    window.addEventListener("pagehide", () => clearTimeout(refreshTimer));
+  }
+
+  function renderAccount(user, name) {
     if (ui.label)
       ui.label.textContent = name
         ? "Signed in as @" + name
         : "Signed in as " + (user.email || "reader");
+    if (MODE === "optional") renderIdleStatus();
+  }
 
-    if (ui.signOut && !ui.signOut.dataset.bound) {
-      ui.signOut.dataset.bound = "1";
-      ui.signOut.addEventListener("click", async () => {
-        if (busy) return;
-        ui.signOut.disabled = true;
-        try {
-          await signOut();
-        } catch (err) {
-          console.warn("Sign out failed:", err);
-          setStatus(
-            err && err.userMessage
-              ? err.userMessage
-              : "Couldn't sign out. Please try again.",
-            "error",
-          );
-        } finally {
-          if (!signingOut) ui.signOut.disabled = false;
-        }
-      });
+  function renderGuest() {
+    if (ui.label) ui.label.textContent = "Reading as a guest";
+    renderIdleStatus();
+  }
+
+  function offlineFallback() {
+    if (MODE === "setup") return showGateError();
+    if (MODE === "optional") {
+      if (ui.label) ui.label.textContent = "Offline";
+      setStatus(
+        "Couldn't reach the sign-in service. Reading still works.",
+        "error",
+      );
     }
-    if (ui.save && !ui.save.dataset.bound) {
-      ui.save.dataset.bound = "1";
-      ui.save.addEventListener("click", () => runSync("save"));
-    }
-    if (ui.load && !ui.load.dataset.bound) {
-      ui.load.dataset.bound = "1";
-      ui.load.addEventListener("click", () => runSync("load"));
-    }
-    if (MODE === "required") renderIdleStatus();
+    resolveReady(null);
   }
 
   function askChoice({ title, message, actions }) {
@@ -741,7 +846,7 @@
     if (!busy) renderIdleStatus();
   }
 
-  if (MODE === "required") {
+  if (MODE === "optional") {
     window.addEventListener("3nding:favorites-changed", () => markUnsynced());
     window.addEventListener("3nding:settings-changed", () =>
       markUnsynced({ settingsUpdatedAt: Date.now() }),
@@ -754,7 +859,7 @@
 
   // ---------- public API ----------
   async function signOut() {
-    if (MODE === "required" && hasUnsynced()) {
+    if (MODE === "optional" && hasUnsynced()) {
       const choice = await askChoice({
         title: "Unsaved changes",
         message:
@@ -784,7 +889,7 @@
     try {
       await auth.signOut();
       clearLocal();
-      location.replace(LOGIN);
+      location.replace(MODE === "setup" ? LOGIN : HOME);
       return true;
     } catch (err) {
       signingOut = false;
@@ -861,6 +966,21 @@
     return u.href;
   }
 
+  async function finishSignIn(cred, username) {
+    const user = cred.user;
+    const isNew = !!(
+      cred.additionalUserInfo && cred.additionalUserInfo.isNewUser
+    );
+    claimLocal(user.uid);
+    await claimAfterSignup(user, username, isNew);
+    try {
+      await withTimeout(bootstrapUser(user, isNew), NETWORK_TIMEOUT_MS);
+    } catch (err) {
+      console.warn("Auth: initial cloud load failed:", err);
+    }
+    return cred;
+  }
+
   window.Auth = {
     ready,
     nextUrl,
@@ -873,39 +993,49 @@
       const a = await api();
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      const cred = await a.signInWithPopup(provider);
-      const isNew = !!(
-        cred.additionalUserInfo && cred.additionalUserInfo.isNewUser
-      );
-      await claimAfterSignup(cred.user, username, isNew);
-      return cred;
+      return finishSignIn(await a.signInWithPopup(provider), username);
     },
     async signUpWithEmail(email, password, username) {
-      const cred = await (
-        await api()
-      ).createUserWithEmailAndPassword(email, password);
-      await claimAfterSignup(cred.user, username, true);
-      return cred;
+      const a = await api();
+      return finishSignIn(
+        await a.createUserWithEmailAndPassword(email, password),
+        username,
+      );
     },
     async signInWithEmail(email, password) {
-      return (await api()).signInWithEmailAndPassword(email, password);
+      const a = await api();
+      return finishSignIn(
+        await a.signInWithEmailAndPassword(email, password),
+        undefined,
+      );
     },
     async sendPasswordReset(email) {
       return (await api()).sendPasswordResetEmail(email);
     },
   };
 
-  // ---------- boot ----------
   const c = window.FIREBASE_CONFIG;
-  if (!c || !c.apiKey || c.apiKey === "YOUR_API_KEY") {
+  let wasSignedIn = false;
+  try {
+    wasSignedIn = !!localStorage.getItem(UID_KEY);
+  } catch {}
+
+  if (MODE !== "guest") initUi();
+
+  if (MODE === "optional" && !wasSignedIn) {
+    // Guests never load Firebase: zero network, zero Firestore usage.
+    currentUser = null;
+    renderGuest();
+    resolveReady(null);
+  } else if (!c || !c.apiKey || c.apiKey === "YOUR_API_KEY") {
     console.error("Auth: scripts/firebase-config.js is not configured.");
-    MODE !== "guest" ? showGateError() : resolveReady(null);
+    offlineFallback();
   } else {
     loadSdk()
       .then(ensureApp)
       .catch((err) => {
         console.warn("Auth: failed to load:", err);
-        MODE !== "guest" ? showGateError() : resolveReady(null);
+        offlineFallback();
       });
   }
 })();

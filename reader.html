@@ -4,15 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Auth gate: hide the page until sign-in state is known (see scripts/auth.js) -->
-    <script>
-      document.documentElement.classList.add("auth-pending");
-    </script>
-    <style>
-      html.auth-pending body {
-        visibility: hidden;
-      }
-    </style>
+    <script src="scripts/auth.js" data-auth="optional" defer></script>
 
     <title>3NDING — Reader</title>
     <meta name="robots" content="noindex, follow" />
