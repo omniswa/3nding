@@ -328,7 +328,7 @@
         return;
       }
 
-      allBooks = books;
+      allBooks = books.slice().reverse();
       searchRow.hidden = false;
       favRow.hidden = false;
       updateFavCount();
