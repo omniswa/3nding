@@ -18,8 +18,8 @@
   const drawerCloseBtn = document.getElementById("drawerCloseBtn");
 
   const SKELETON_COUNT = 10;
-  const MIN_LOADING_MS = 450; 
-  const PAGE_SIZE = 12; 
+  const MIN_LOADING_MS = 450;
+  const PAGE_SIZE = 12;
   const FAVORITES_KEY = "3nding:favorites";
   const REMOVED_KEY = "3nding:favorites-removed";
 
@@ -167,11 +167,7 @@
       const cover = escapeHtml(book.cover);
       const id = String(book.id);
       const active = isFavorite(id);
-      const card = document.createElement("a");
-      card.href = `reader.html?id=${encodeURIComponent(book.id)}`;
-      card.setAttribute("aria-label", `${book.title} by ${book.author}`);
-      card.style.textDecoration = "none";
-      card.style.color = "inherit";
+      const card = document.createElement("article");
       card.className = "card";
       card.style.animationDelay = `${Math.min(i * 40, 400)}ms`;
       card.innerHTML = `
@@ -180,12 +176,10 @@
           <img src="${cover}" alt="Cover of ${title}" loading="lazy">
         </div>
         <div class="card-body">
-          <p class="card-title">${title}</p>
+          <p class="card-title"><a class="card-link" href="reader.html?id=${encodeURIComponent(book.id)}">${title}</a></p>
           <p class="card-author">${author}</p>
         </div>
-        <div class="slip">
-          <span>No. ${String(book.id).padStart(3, "0")}</span>
-        </div>
+        <div class="slip"><span>No. ${String(book.id).padStart(3, "0")}</span></div>
       `;
       card.querySelector(".fav-btn").addEventListener("click", (e) => {
         e.preventDefault();
@@ -211,7 +205,8 @@
 
   function scrollToGrid() {
     const top = grid.getBoundingClientRect().top + window.scrollY - 90;
-    window.scrollTo({ top, behavior: "smooth" });
+      const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
   }
 
   prevPageBtn.addEventListener("click", () => {
@@ -235,8 +230,7 @@
   }
 
   function setStatus(text, animated) {
-    if (animated)
-      status.innerHTML = `<span class="dot"></span> ${text}`;
+    if (animated) status.innerHTML = `<span class="dot"></span> ${text}`;
     else status.textContent = text;
   }
 
@@ -252,7 +246,7 @@
         .sort((a, b) => {
           const timeA = favorites.get(String(a.id)) || 0;
           const timeB = favorites.get(String(b.id)) || 0;
-          return timeB - timeA; 
+          return timeB - timeA;
         });
     }
 
@@ -310,7 +304,7 @@
     favorites = loadFavorites();
     removed = loadRemoved();
     updateFavCount();
-    applyFilter(false);
+    if (allBooks.length) applyFilter(false);
   });
 
   async function loadBooks() {
@@ -319,7 +313,7 @@
 
     const started = Date.now();
     try {
-      const res = await fetch("books.json", { cache: "no-store" });
+      const res = await fetch("books.json", { cache: "no-cache" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const books = await res.json();
 

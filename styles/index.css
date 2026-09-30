@@ -451,6 +451,7 @@ main {
 
 /* ---- Catalog card ---- */
 .card {
+  position: relative;
   background: var(--paper);
   border-radius: var(--radius);
   overflow: hidden;
@@ -462,6 +463,22 @@ main {
   opacity: 0;
   transform: translateY(10px);
   animation: rise 0.5s ease forwards;
+}
+
+.card-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.card:has(.card-link:focus-visible) {
+  outline: 2px solid var(--brass-bright);
+  outline-offset: 2px;
 }
 
 @keyframes rise {
@@ -723,9 +740,15 @@ footer {
   min-height: 1.5em;
 }
 
-.sync-note[data-state="dirty"] { color: var(--brass-bright); }
-.sync-note[data-state="good"]  { color: #8fb59d; }
-.sync-note[data-state="error"] { color: #e0857f; }
+.sync-note[data-state="dirty"] {
+  color: var(--brass-bright);
+}
+.sync-note[data-state="good"] {
+  color: #8fb59d;
+}
+.sync-note[data-state="error"] {
+  color: #e0857f;
+}
 
 .sync-dialog {
   width: min(360px, 90vw);
@@ -736,7 +759,9 @@ footer {
   border-radius: var(--radius);
 }
 
-.sync-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.sync-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
 
 .sync-dialog h2 {
   font-family: "Fraunces", serif;
@@ -762,7 +787,9 @@ footer {
   max-width: 420px;
   margin: 20vh auto;
   padding: 0 1.25rem;
-  font: 0.9rem/1.6 "Space Mono", monospace;
+  font:
+    0.9rem/1.6 "Space Mono",
+    monospace;
   color: var(--text-light);
   text-align: center;
 }

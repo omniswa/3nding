@@ -16,12 +16,18 @@
     list.forEach(b => b.classList.toggle('active', b === btn));
   }
   
-  function setMethod(value, sourceBtn) {
-    if (!PAYMENT_URLS[value]) return;
-    method = value;
-    if (sourceBtn) setActiveButton(methodButtons, sourceBtn);
-    giveBtn.href = PAYMENT_URLS[method];
-  }
+    function setMethod(value) {
+      if (!PAYMENT_URLS[value]) return;
+      method = value;
+      methodButtons.forEach((b) => {
+        const on = b.dataset.method === value;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+      giveBtn.href = PAYMENT_URLS[value];
+      giveBtn.target = "_blank";
+      giveBtn.rel = "noopener noreferrer";
+    }
   
   methodButtons.forEach(btn => {
     btn.addEventListener('click', () => setMethod(btn.dataset.method, btn));

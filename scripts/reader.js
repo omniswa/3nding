@@ -246,12 +246,19 @@
     saveProgress(bookId, next);
   }
 
-  function onScroll() {
-    if (isLoading || persistDisabled) return;
-    updateProgressUI();
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(persistProgress, 250);
-  }
+   let ticking = false;
+   function onScroll() {
+     if (isLoading || persistDisabled) return;
+     if (!ticking) {
+       ticking = true;
+       requestAnimationFrame(() => {
+         ticking = false;
+         updateProgressUI();
+       });
+     }
+     clearTimeout(saveTimer);
+     saveTimer = setTimeout(persistProgress, 250);
+   }
 
   // ---------- "newer progress elsewhere" prompt ----------
   function dismissBanner() {
