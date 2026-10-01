@@ -1,4 +1,4 @@
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `3nding-shell-${VERSION}`;
 const BOOK_CACHE = "3nding-books";
 
@@ -9,11 +9,18 @@ const SHELL_FILES = [
   "/manifest.json",
   "/styles/index.css",
   "/styles/reader.css",
+  "/styles/auth.css",
+  "/styles/support.css",
   "/scripts/index.js",
   "/scripts/reader.js",
   "/scripts/jszip.js",
   "/scripts/auth.js",
+  "/scripts/auth-page.js",
   "/scripts/firebase-config.js",
+  "/scripts/share.js",
+  "/scripts/engage.js",
+  "/scripts/support.js",
+  "/scripts/pwa.js",
   "/fonts/fraunces.woff2",
   "/fonts/worksans.woff2",
   "/fonts/spacemono.woff2",
@@ -22,6 +29,10 @@ const SHELL_FILES = [
   "/pages/about.html",
   "/pages/terms.html",
   "/pages/privacy.html",
+  "/pages/support.html",
+  "/pages/login.html",
+  "/pages/signup.html",
+  "/pages/username.html",
 ];
 
 self.addEventListener("install", (event) => {
