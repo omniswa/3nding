@@ -113,25 +113,6 @@
 
       <button class="reset-btn" id="resetBtn">Reset to defaults</button>
 
-      <div class="sync-row" id="accountRow">
-        <span class="setting-label">Account</span>
-        <p class="sync-status" id="accountEmail">Signed in</p>
-        <div class="sync-actions">
-          <button type="button" class="opt-btn" id="cloudSaveBtn">
-            Save to cloud
-          </button>
-          <button type="button" class="opt-btn" id="cloudLoadBtn">
-            Load from cloud
-          </button>
-        </div>
-        <p
-          class="sync-note"
-          id="syncStatus"
-          role="status"
-          aria-live="polite"
-        ></p>
-        <button type="button" class="opt-btn" id="signOutBtn">Sign out</button>
-      </div>
 
       <a href="pages/support.html" class="drawer-support-link"
         >Support the archive &rarr;</a
@@ -144,10 +125,9 @@
       </div>
     </div>
 
-    <script src="scripts/firebase-config.js" defer></script>
-    <script src="scripts/auth.js" data-auth="optional" defer></script>
     <script src="scripts/reader.js" defer></script>
     <script src="scripts/share.js" defer></script>
     <script src="scripts/engage.js" defer></script>
+    <script src="scripts/reader-end.js" defer></script>
   </body>
 </html>

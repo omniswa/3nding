@@ -14,7 +14,6 @@
     SIZE_STEP = 1;
 
   const MIN_SAVE_DELTA = 0.02; 
-  const RESUME_PROMPT_DELTA = 0.03; 
   let lastSaved = null;
 
   const el = {
@@ -47,7 +46,6 @@
   let isLoading = true;
   let persistDisabled = false; 
   let loadToken = 0; 
-  let banner = null;
 
   function naturalSort(a, b) {
     return a.localeCompare(b, undefined, {
@@ -261,67 +259,6 @@
      saveTimer = setTimeout(persistProgress, 250);
    }
 
-  // ---------- "newer progress elsewhere" prompt ----------
-  function dismissBanner() {
-    if (banner) {
-      banner.remove();
-      banner = null;
-    }
-  }
-
-  function showResumeBanner(saved) {
-    dismissBanner();
-    const total = manifest.chapters.length;
-    const chapterNo = Math.min(Math.max(saved.chapterIndex, 0), total - 1) + 1;
-
-    banner = document.createElement("div");
-    banner.className = "resume-banner";
-    banner.setAttribute("role", "status");
-
-    const msg = document.createElement("p");
-    msg.textContent = `Newer progress from another device: chapter ${chapterNo} of ${total}.`;
-
-    const go = document.createElement("button");
-    go.type = "button";
-    go.className = "resume-btn is-primary";
-    go.textContent = "Continue there";
-    go.addEventListener("click", () => {
-      dismissBanner();
-      loadChapter(saved.chapterIndex, true);
-    });
-
-    const stay = document.createElement("button");
-    stay.type = "button";
-    stay.className = "resume-btn";
-    stay.textContent = "Stay here";
-    stay.addEventListener("click", dismissBanner);
-
-    banner.append(msg, go, stay);
-    document.body.appendChild(banner);
-  }
-
-  window.addEventListener("3nding:cloud-updated", (e) => {
-    if (e.detail && e.detail.settings) {
-      settings = loadSettings();
-      applySettings();
-    }
-
-    if (!manifest || isLoading) return;
-    const saved = loadProgress(bookId);
-    if (!saved) return;
-    const knownAt = lastSaved ? lastSaved.updatedAt : 0;
-    if (saved.updatedAt <= knownAt) return;
-    lastSaved = saved;
-    const differs =
-      saved.chapterIndex !== chapterIndex ||
-      Math.abs(saved.scrollFraction - scrollFraction()) > RESUME_PROMPT_DELTA;
-    if (differs) showResumeBanner(saved);
-  });
-  window.addEventListener("3nding:signout-state", (e) => {
-    persistDisabled = !!(e.detail && e.detail.active);
-    if (persistDisabled) clearTimeout(saveTimer);
-  });
-
   // ---------- rendering ----------
   function renderState(message) {
     el.surface.innerHTML = `<div class="state-box"><span class="dot"></span> ${message}</div>`;
@@ -355,7 +292,6 @@
     const token = ++loadToken;
     isLoading = true;
     clearTimeout(saveTimer);
-    dismissBanner();
 
     chapterIndex = Math.min(Math.max(index, 0), manifest.chapters.length - 1);
     const chapter = manifest.chapters[chapterIndex];

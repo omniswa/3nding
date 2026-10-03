@@ -374,12 +374,6 @@
     applyFilter(true);
   });
 
-  window.addEventListener("3nding:cloud-updated", () => {
-    favorites = loadFavorites();
-    removed = loadRemoved();
-    updateFavCount();
-    if (allBooks.length) applyFilter(false);
-  });
 
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) renderShelf();

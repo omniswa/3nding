@@ -1,20 +1,3 @@
-/*
- * 3NDING engagement module (additive; no changes to index.js / reader.js)
- *
- * Catalog (index.html):
- *   - "Finished" shelf
- *   - "New" badge on books whose books.json entry has  "added": "YYYY-MM-DD"
- *   - "Surprise me" button
- *   - Reading streak line
- *   - Per-card "save offline" toggle
- *   - "Add to home screen" prompt (after the 2nd visit)
- *   - "Request a book" footer link
- * Reader (reader.html):
- *   - Records reading days for the streak
- *   - "Next on the shelf" suggestion on the last chapter
- *
- * All data stays in localStorage / Cache Storage on the device.
- */
 (function () {
   "use strict";
 
@@ -53,16 +36,10 @@
 .offline-btn:hover{border-color:var(--brass,#b8923f);color:var(--brass,#b8923f)}
 .offline-btn[data-saved="true"]{background:var(--moss,#48594f);color:#f2e9d3;border-color:var(--moss,#48594f)}
 .offline-btn:disabled{opacity:.5;cursor:default}
-.offline-btn:focus-visible,.install-banner button:focus-visible,.next-up a:focus-visible{outline:2px solid var(--brass-bright,#d4ac57);outline-offset:2px}
-.install-banner{position:fixed;left:50%;bottom:max(1rem,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(440px,calc(100vw - 2rem));z-index:25;display:flex;flex-wrap:wrap;gap:.6rem;padding:.9rem 1rem;background:#1f2530;color:#ece4d1;border:1px solid rgba(184,146,63,.35);border-radius:2px;box-shadow:0 8px 24px -8px rgba(0,0,0,.6);font:.8rem/1.5 "Space Mono",monospace}
+.offline-btn:focus-visible,.install-banner button:focus-visible,.install-banner{position:fixed;left:50%;bottom:max(1rem,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(440px,calc(100vw - 2rem));z-index:25;display:flex;flex-wrap:wrap;gap:.6rem;padding:.9rem 1rem;background:#1f2530;color:#ece4d1;border:1px solid rgba(184,146,63,.35);border-radius:2px;box-shadow:0 8px 24px -8px rgba(0,0,0,.6);font:.8rem/1.5 "Space Mono",monospace}
 .install-banner p{flex:1 1 100%;margin:0}
 .install-banner button{flex:1;min-height:44px;font:inherit;color:inherit;background:transparent;border:1px solid rgba(184,146,63,.35);border-radius:2px;cursor:pointer}
 .install-banner button.primary{background:#b8923f;border-color:#b8923f;color:#171b21;font-weight:600}
-.next-up{display:flex;gap:1rem;align-items:center;margin-top:1.5rem;padding:1rem 1.1rem;border:1px dashed var(--read-line,rgba(42,36,28,.25));border-radius:2px;color:var(--read-fg,#2a241c)}
-.next-up img{width:54px;height:72px;object-fit:cover;flex-shrink:0;background:#e7dcc0}
-.next-up h2{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:1.05rem;margin:0 0 .15rem}
-.next-up p{margin:0 0 .5rem;font-size:.85rem;color:var(--read-fg-soft,#5c5342)}
-.next-up a{font-family:"Space Mono",monospace;font-size:.78rem;color:inherit;border-bottom:1px dotted currentColor;text-decoration:none}
 `;
   document.head.appendChild(style);
 
@@ -355,7 +332,7 @@
       bar.className = "install-banner";
       bar.setAttribute("role", "status");
       bar.innerHTML =
-        "<p>Add 3NDING to your home screen to open it like an app and read offline.</p>" +
+        "<p>Add 3NDING to your home screen?</p>" +
         '<button type="button" class="primary" data-yes>Add</button>' +
         '<button type="button" data-no>Not now</button>';
       bar.querySelector("[data-yes]").addEventListener("click", async () => {
@@ -389,7 +366,6 @@
 
     if (searchInput) searchInput.addEventListener("input", renderFinished);
     if (favToggle) favToggle.addEventListener("click", renderFinished);
-    window.addEventListener("3nding:cloud-updated", refresh);
     window.addEventListener("pageshow", refresh);
     window.addEventListener("storage", refresh);
     new MutationObserver(decorateCards).observe(grid, { childList: true });
@@ -410,44 +386,5 @@
 
   if (surface && bookId) {
     window.addEventListener("3nding:progress-changed", markToday);
-
-    async function pickNext() {
-      const list = await loadBooks();
-      const progress = readProgress();
-      const others = list.filter((b) => String(b.id) !== String(bookId));
-      const fresh = others.filter((b) => !progress.has(String(b.id)));
-      const pool = fresh.length
-        ? fresh
-        : others.filter((b) => !isFinished(progress.get(String(b.id))));
-      return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
-    }
-
-    new MutationObserver(async () => {
-      const next = $("nextBtn");
-      const nav = surface.querySelector(".chapter-nav");
-      if (!next || !nav || !next.disabled || surface.querySelector(".next-up"))
-        return;
-
-      const pick = await pickNext();
-      if (!pick || !nav.isConnected || surface.querySelector(".next-up"))
-        return;
-
-      const card = document.createElement("div");
-      card.className = "next-up";
-      card.innerHTML =
-        '<img src="' +
-        esc(pick.cover) +
-        '" alt="" width="54" height="72" loading="lazy">' +
-        "<div><h2>Next on the shelf</h2><p>" +
-        esc(pick.title) +
-        " by " +
-        esc(pick.author) +
-        "</p>" +
-        '<a href="reader.html?id=' +
-        encodeURIComponent(pick.id) +
-        '">Start reading</a></div>';
-      const after = surface.querySelector(".finish-card") || nav;
-      after.insertAdjacentElement("afterend", card);
-    }).observe(surface, { childList: true });
   }
 })();

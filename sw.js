@@ -1,4 +1,4 @@
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `3nding-shell-${VERSION}`;
 const BOOK_CACHE = "3nding-books";
 
@@ -9,14 +9,10 @@ const SHELL_FILES = [
   "/manifest.json",
   "/styles/index.css",
   "/styles/reader.css",
-  "/styles/auth.css",
   "/styles/support.css",
   "/scripts/index.js",
   "/scripts/reader.js",
   "/scripts/jszip.js",
-  "/scripts/auth.js",
-  "/scripts/auth-page.js",
-  "/scripts/firebase-config.js",
   "/scripts/share.js",
   "/scripts/engage.js",
   "/scripts/support.js",
@@ -30,9 +26,6 @@ const SHELL_FILES = [
   "/pages/terms.html",
   "/pages/privacy.html",
   "/pages/support.html",
-  "/pages/login.html",
-  "/pages/signup.html",
-  "/pages/username.html",
 ];
 
 self.addEventListener("install", (event) => {
@@ -90,7 +83,7 @@ async function networkFirst(request, cacheName) {
 async function cacheFirst(request, cacheName) {
   const cached = await caches.match(request);
   if (cached) return cached;
-  return store(cacheName, request, await fetch(request));
+  return fetch(request);
 }
 
 async function staleWhileRevalidate(event) {

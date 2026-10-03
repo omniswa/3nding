@@ -34,10 +34,6 @@
 .share-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 .share-act:focus-visible{outline:2px solid #48594f;outline-offset:2px}
 .share-note{min-height:1.2em;margin:0;font-family:"Space Mono",monospace;font-size:.7rem;color:#48594f}
-.finish-card{margin-top:2rem;padding:1.2rem 1.3rem;border:1px dashed var(--read-line,rgba(42,36,28,.25));border-radius:2px;color:var(--read-fg,#2a241c)}
-.finish-card h2{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:1.25rem;margin:0 0 .35rem}
-.finish-card p{margin:0 0 .9rem;font-size:.9rem;line-height:1.55;color:var(--read-fg-soft,#5c5342)}
-.finish-card .share-act{color:var(--read-fg,#2a241c)}
 `;
   const style = document.createElement("style");
   style.textContent = css;
@@ -66,7 +62,10 @@
       try {
         input.focus();
         input.select();
-        return document.execCommand("copy");
+        const execCopy = (document.defaultView || document).execCommand;
+        return typeof execCopy === "function"
+          ? Boolean(execCopy.call(document, "copy"))
+          : false;
       } catch {
         return false;
       }
@@ -224,27 +223,5 @@
     const settings = document.getElementById("settingsBtn");
     topInner.insertBefore(btn, settings || null);
 
-    // "Pass it on" card on the last chapter
-    new MutationObserver(() => {
-      const next = document.getElementById("nextBtn");
-      const nav = surface.querySelector(".chapter-nav");
-      if (
-        !next ||
-        !nav ||
-        !next.disabled ||
-        surface.querySelector(".finish-card")
-      )
-        return;
-      const card = document.createElement("div");
-      card.className = "finish-card";
-      card.innerHTML =
-        "<h2>You reached the last page.</h2>" +
-        "<p>Know someone who'd like this one? Send it their way.</p>" +
-        '<button type="button" class="share-act">Share this book</button>';
-      card
-        .querySelector("button")
-        .addEventListener("click", async () => openShare(await currentBook()));
-      nav.insertAdjacentElement("afterend", card);
-    }).observe(surface, { childList: true });
   }
 })();
